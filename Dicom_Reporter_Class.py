@@ -167,9 +167,9 @@ class Dicom_Reporter(object):
             modality = 'Unknown'
 
         # these are pointer they link to the dict content in memory
-        if 'rt' in modality.lower():
+        if modality.lower() == 'rtstruct':
             out_dict = self.rt_dict
-        elif 'rd' in modality.lower():
+        elif modality.lower() == 'rtdose':
             out_dict = self.rd_dict
         else:
             out_dict = self.dicom_dict

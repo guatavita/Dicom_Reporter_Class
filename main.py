@@ -4,7 +4,7 @@ from Dicom_Reporter_Class import *
 def main():
     root = r'Z:\Morfeus'
     input_dir = os.path.join(root, r'Bastien\DICOM\AIP_LACC')
-    output_dir = os.path.join(input_dir, 'niftii')
+    output_dir = os.path.join(input_dir, 'nifti')
 
     supp_tags = {
         'MammoDesc': '0055|1001'
@@ -20,6 +20,7 @@ def main():
                                     nb_threads=1, verbose=False)
     dicom_explorer.run_conversion()
     print("     Elapse time {}".format(time.time() - time_start))
+
 
 if __name__ == '__main__':
     main()

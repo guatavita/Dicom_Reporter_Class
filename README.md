@@ -1,6 +1,6 @@
 # Dicom_Reporter_Class
 
-This class is a DICOM listener that will create a report of all the dicom seriesID/patientID in the output directory as well as possibibly convert them to niftii images.
+This class is a DICOM listener that will create a report of all the dicom seriesID/patientID in the output directory as well as possibibly convert them to nifti images.
 
 ### Example
 
