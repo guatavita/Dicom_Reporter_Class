@@ -9,9 +9,7 @@ from queue import *
 from tqdm import tqdm
 import numpy as np
 import SimpleITK as sitk
-import pydicom
-from pydicom.tag import Tag
-import gdcm  # pip install python-gdcm
+import gdcm
 
 
 def splitext_(path):

@@ -1,0 +1,4 @@
+tqdm
+numpy
+SimpleITK
+python-gdcm
