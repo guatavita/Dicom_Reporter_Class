@@ -3,7 +3,7 @@ from Dicom_Reporter_Class import *
 
 def main():
     root = r'Z:\Morfeus'
-    input_dir = os.path.join(root, r'Bastien\DICOM\AIP_LACC')
+    input_dir = os.path.join(root, r'Bastien\DICOM\DICOM_report_test\data')
     output_dir = os.path.join(input_dir, 'nifti')
 
     supp_tags = {

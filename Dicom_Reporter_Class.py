@@ -32,7 +32,8 @@ class Dicom_Reporter(object):
         :param verbose:
         '''
 
-        # TODO add rtstruct_dict, rtdose_dict and manage merging between images and RTs
+        # TODO add rtdose_dict and manage merging between images and RTs using sITK
+        # TODO add rtstruct_dict and manage merging between images and RTs using pydicom
         # TODO add writer dose and writer RT in respective output dir
         self.input_dir = input_dir
         self.output_dir = output_dir
@@ -54,11 +55,24 @@ class Dicom_Reporter(object):
         self.load_dcm_report()
         self.walk_main_directory()
         self.dicom_explorer()
+        self.create_association()
         self.save_dcm_report()
 
     def create_association(self):
-        # TODO merge rt_dict and rd_dict to dicom_dict for each series
-        pass
+        # TODO merge rt_dict to dicom_dict for each series
+        # merging rdstruct to the corresponding study instance uid of the images
+        for rd_series_key in tqdm(self.rd_dict.keys()):
+            rd_study_instance_uid = self.rd_dict[rd_series_key]['StudyInstanceUID']
+            if not rd_study_instance_uid:
+                continue
+            for dcm_series_key in self.dicom_dict.keys():
+                dcm_study_instance_uid = self.dicom_dict[dcm_series_key]['StudyInstanceUID']
+                if not dcm_study_instance_uid:
+                    continue
+                if dcm_study_instance_uid == rd_study_instance_uid:
+                    if not self.dicom_dict[dcm_series_key].get('RTDOSE'):
+                        self.dicom_dict[dcm_series_key]['RTDOSE'] = []
+                    self.dicom_dict[dcm_series_key]['RTDOSE'].append(self.rd_dict[rd_series_key])
 
     def force_update(self):
         self.walk_main_directory()
@@ -81,6 +95,7 @@ class Dicom_Reporter(object):
     def set_tags(self, supp_tags):
         tags = {
             'SOPClassUID': '0008|0016',
+            'StudyInstanceUID': '0020|000d',
             'StudyDate': '0008|0020',
             'SeriesDate': '0008|0021',
             'Modality': '0008|0060',
@@ -216,8 +231,6 @@ class Dicom_Reporter(object):
                 reader.LoadPrivateTagsOn()
                 try:
                     series_dict = self.dicom_dict[series_id]
-                    dicom_filenames = series_dict['dicom_filenames']
-                    reader.SetFileNames(dicom_filenames)
                     series_description = series_dict['SeriesDescription'].rstrip().replace(' ', '_')
                     series_description = ''.join(e for e in series_description if e.isalnum() or e == '_')
                     if series_dict['PresentationIntentType']:
@@ -230,10 +243,28 @@ class Dicom_Reporter(object):
                     output_filename = os.path.join(output_dir, 'image_series_{}.nii.gz'.format(series_id))
                     if not self.force_rewrite and os.path.exists(output_filename):
                         continue
+
+                    dicom_filenames = series_dict['dicom_filenames']
+                    reader.SetFileNames(dicom_filenames)
                     dicom_handle = reader.Execute()
                     identity_direction = tuple(np.identity(len(dicom_handle.GetSize())).flatten())
                     dicom_handle.SetDirection(identity_direction)
                     sitk.WriteImage(dicom_handle, output_filename)
+
+                    if series_dict.get('RTDOSE'):
+                        rtdose_filenames = series_dict['RTDOSE']['dicom_filenames']
+                        reader.SetFileNames(rtdose_filenames)
+                        dose_handle = reader.Execute()
+                        dose_handle.SetOrigin(dicom_handle.GetOrigin())
+                        dose_handle.SetDirection(dicom_handle.GetDirection())
+                        dose_handle.SetSpacing(dicom_handle.GetSpacing())
+                        dose_handle.SetSize(dicom_handle.GetSize())
+                        sitk.WriteImage(dicom_handle, output_filename.replace('image_', 'dose_'))
+
+                    if series_dict.get('RTSTRUCT'):
+                        xxx = 1
+                        # use pydicom to write sequence of mask per contour
+
                 except:
                     print('Failed on {} {} {}'.format(series_dict['PatientID'], series_id, output_path))
                 q.task_done()
