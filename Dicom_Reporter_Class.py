@@ -72,7 +72,8 @@ class Dicom_Reporter(object):
                 if dcm_study_instance_uid == rd_study_instance_uid:
                     if not self.dicom_dict[dcm_series_key].get('RTDOSE'):
                         self.dicom_dict[dcm_series_key]['RTDOSE'] = []
-                    self.dicom_dict[dcm_series_key]['RTDOSE'].append(self.rd_dict[rd_series_key])
+                    if rd_series_key not in self.dicom_dict[dcm_series_key]['RTDOSE']:
+                        self.dicom_dict[dcm_series_key]['RTDOSE'].append(rd_series_key)
 
     def force_update(self):
         self.walk_main_directory()
@@ -251,15 +252,22 @@ class Dicom_Reporter(object):
                     dicom_handle.SetDirection(identity_direction)
                     sitk.WriteImage(dicom_handle, output_filename)
 
+                    # TODO manage beam and planning dose
+                    # TODO divide unit and resample?
                     if series_dict.get('RTDOSE'):
-                        rtdose_filenames = series_dict['RTDOSE']['dicom_filenames']
-                        reader.SetFileNames(rtdose_filenames)
-                        dose_handle = reader.Execute()
-                        dose_handle.SetOrigin(dicom_handle.GetOrigin())
-                        dose_handle.SetDirection(dicom_handle.GetDirection())
-                        dose_handle.SetSpacing(dicom_handle.GetSpacing())
-                        dose_handle.SetSize(dicom_handle.GetSize())
-                        sitk.WriteImage(dicom_handle, output_filename.replace('image_', 'dose_'))
+                        i=0
+                        for rtdose_series_id in series_dict['RTDOSE']:
+                            if not self.rd_dict.get(rtdose_series_id):
+                                continue
+                            rtdose_filenames = self.rd_dict[rtdose_series_id]['dicom_filenames']
+                            reader.SetFileNames(rtdose_filenames)
+                            dose_handle = reader.Execute()
+                            # dose_handle.SetOrigin(dicom_handle.GetOrigin())
+                            # dose_handle.SetDirection(dicom_handle.GetDirection())
+                            # dose_handle.SetSpacing(dicom_handle.GetSpacing())
+                            # dose_handle.SetSize(dicom_handle.GetSize())
+                            sitk.WriteImage(dose_handle, output_filename.replace('image_', 'dose_{}_'.format(i)))
+                            i += 1
 
                     if series_dict.get('RTSTRUCT'):
                         xxx = 1
@@ -281,7 +289,7 @@ class Dicom_Reporter(object):
             threads.append(t)
 
         for series_id in tqdm(self.dicom_dict.keys()):
-            output_path = os.path.join(self.output_dir, self.dicom_dict[series_id]['PatientID'])
+            output_path = os.path.join(self.output_dir, self.dicom_dict[series_id]['PatientID'].rstrip())
 
             if not os.path.exists(output_path):
                 os.makedirs(output_path)
