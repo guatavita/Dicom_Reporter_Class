@@ -35,6 +35,8 @@ class Dicom_Reporter(object):
         # TODO add rtdose_dict and manage merging between images and RTs using sITK
         # TODO add rtstruct_dict and manage merging between images and RTs using pydicom
         # TODO add writer dose and writer RT in respective output dir
+        # TODO create a separate function for image_writer, rtdose_writer, rtstruct_writer
+
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.dicom_dict = {}
@@ -115,6 +117,7 @@ class Dicom_Reporter(object):
             'ProtocolName': '0018|1030',
             'SliceThickness': '0018|0050',
             'SpacingBetweenSlices': '0018|0088',
+            'DoseGridScaling': '3004|000e'
         }
         try:
             if list(supp_tags.keys()):
@@ -252,8 +255,8 @@ class Dicom_Reporter(object):
                     dicom_handle.SetDirection(identity_direction)
                     sitk.WriteImage(dicom_handle, output_filename)
 
-                    # TODO manage beam and planning dose
-                    # TODO divide unit and resample?
+                    # TODO manage beam and planning dose using dicom metadata?
+                    # TODO use dicom handle to resample
                     if series_dict.get('RTDOSE'):
                         i=0
                         for rtdose_series_id in series_dict['RTDOSE']:
@@ -262,13 +265,25 @@ class Dicom_Reporter(object):
                             rtdose_filenames = self.rd_dict[rtdose_series_id]['dicom_filenames']
                             reader.SetFileNames(rtdose_filenames)
                             dose_handle = reader.Execute()
-                            # dose_handle.SetOrigin(dicom_handle.GetOrigin())
-                            # dose_handle.SetDirection(dicom_handle.GetDirection())
-                            # dose_handle.SetSpacing(dicom_handle.GetSpacing())
-                            # dose_handle.SetSize(dicom_handle.GetSize())
-                            sitk.WriteImage(dose_handle, output_filename.replace('image_', 'dose_{}_'.format(i)))
+                            origin = dose_handle.GetOrigin()
+                            spacing = dose_handle.GetSpacing()
+                            dose_array = np.squeeze(sitk.GetArrayFromImage(dose_handle))
+                            dose_array = dose_array*float(self.rd_dict[rtdose_series_id]['DoseGridScaling'])
+                            if len(dose_array.shape) > 3:
+                                for c in range(dose_array.shape[0]):
+                                    dose_handle = sitk.GetImageFromArray(dose_array[c])
+                                    dose_handle.SetOrigin(origin[:3])
+                                    dose_handle.SetSpacing(spacing[:3])
+                                    sitk.WriteImage(dose_handle,
+                                                    output_filename.replace('image_', 'dose_{}_c{}_'.format(i, c)))
+                            else:
+                                dose_handle = sitk.GetImageFromArray(dose_array)
+                                dose_handle.SetOrigin(origin[:3])
+                                dose_handle.SetSpacing(spacing[:3])
+                                sitk.WriteImage(dose_handle, output_filename.replace('image_', 'dose_{}_'.format(i)))
                             i += 1
 
+                    # TODO use pydicom to write RTstruct
                     if series_dict.get('RTSTRUCT'):
                         xxx = 1
                         # use pydicom to write sequence of mask per contour
