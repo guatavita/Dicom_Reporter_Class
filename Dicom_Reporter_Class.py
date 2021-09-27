@@ -117,7 +117,8 @@ class Dicom_Reporter(object):
             'ProtocolName': '0018|1030',
             'SliceThickness': '0018|0050',
             'SpacingBetweenSlices': '0018|0088',
-            'DoseGridScaling': '3004|000e'
+            'DoseGridScaling': '3004|000e',
+            'DoseSummationType': '3004|000a',
         }
         try:
             if list(supp_tags.keys()):
@@ -223,6 +224,48 @@ class Dicom_Reporter(object):
                 print("Warning: NO series ids were found")
         return series_dict
 
+    def resampler(self, fixed, moving):
+        resampler = sitk.ResampleImageFilter()
+        resampler.SetNumberOfThreads(0)
+        resampler.SetReferenceImage(fixed)
+        return resampler.Execute(moving)
+
+    def dose_writer(self, output_dir, rtdose_series={}, dicom_handle=None):
+        reader = sitk.ImageSeriesReader()
+        reader.MetaDataDictionaryArrayUpdateOn()
+        reader.LoadPrivateTagsOn()
+        i = 0
+        for rtdose_series_id in rtdose_series['RTDOSE']:
+            if not self.rd_dict.get(rtdose_series_id):
+                continue
+            rtdose_filenames = self.rd_dict[rtdose_series_id]['dicom_filenames']
+            reader.SetFileNames(rtdose_filenames)
+            dose_handle = reader.Execute()
+            origin = dose_handle.GetOrigin()
+            spacing = dose_handle.GetSpacing()
+            dose_array = np.squeeze(sitk.GetArrayFromImage(dose_handle))
+            dose_array = dose_array * float(self.rd_dict[rtdose_series_id]['DoseGridScaling'])
+            if len(dose_array.shape) > 3:
+                for c in range(dose_array.shape[0]):
+                    dose_handle = sitk.GetImageFromArray(dose_array[c])
+                    dose_handle.SetOrigin(origin[:3])
+                    dose_handle.SetSpacing(spacing[:3])
+                    if dicom_handle:
+                        dose_handle = self.resampler(fixed=dicom_handle, moving=dose_handle)
+                    sitk.WriteImage(dose_handle,
+                                    os.path.join(output_dir, 'dose_{}_{}_{}_'.format(i, self.rd_dict[
+                                        rtdose_series_id]['DoseSummationType'], c)))
+            else:
+                dose_handle = sitk.GetImageFromArray(dose_array)
+                dose_handle.SetOrigin(origin[:3])
+                dose_handle.SetSpacing(spacing[:3])
+                if dicom_handle:
+                    dose_handle = self.resampler(fixed=dicom_handle, moving=dose_handle)
+                sitk.WriteImage(dose_handle,
+                                os.path.join(output_dir, 'dose_{}_{}'.format(i, self.rd_dict[
+                                    rtdose_series_id]['DoseSummationType'])))
+            i += 1
+
     def dicom_writer_worker(self, q):
         while True:
             item = q.get()
@@ -255,33 +298,8 @@ class Dicom_Reporter(object):
                     dicom_handle.SetDirection(identity_direction)
                     sitk.WriteImage(dicom_handle, output_filename)
 
-                    # TODO manage beam and planning dose using dicom metadata?
-                    # TODO use dicom handle to resample
                     if series_dict.get('RTDOSE'):
-                        i=0
-                        for rtdose_series_id in series_dict['RTDOSE']:
-                            if not self.rd_dict.get(rtdose_series_id):
-                                continue
-                            rtdose_filenames = self.rd_dict[rtdose_series_id]['dicom_filenames']
-                            reader.SetFileNames(rtdose_filenames)
-                            dose_handle = reader.Execute()
-                            origin = dose_handle.GetOrigin()
-                            spacing = dose_handle.GetSpacing()
-                            dose_array = np.squeeze(sitk.GetArrayFromImage(dose_handle))
-                            dose_array = dose_array*float(self.rd_dict[rtdose_series_id]['DoseGridScaling'])
-                            if len(dose_array.shape) > 3:
-                                for c in range(dose_array.shape[0]):
-                                    dose_handle = sitk.GetImageFromArray(dose_array[c])
-                                    dose_handle.SetOrigin(origin[:3])
-                                    dose_handle.SetSpacing(spacing[:3])
-                                    sitk.WriteImage(dose_handle,
-                                                    output_filename.replace('image_', 'dose_{}_c{}_'.format(i, c)))
-                            else:
-                                dose_handle = sitk.GetImageFromArray(dose_array)
-                                dose_handle.SetOrigin(origin[:3])
-                                dose_handle.SetSpacing(spacing[:3])
-                                sitk.WriteImage(dose_handle, output_filename.replace('image_', 'dose_{}_'.format(i)))
-                            i += 1
+                        self.dose_writer(output_dir=output_dir, rtdose_series=series_dict['RTDOSE'])
 
                     # TODO use pydicom to write RTstruct
                     if series_dict.get('RTSTRUCT'):
@@ -289,7 +307,7 @@ class Dicom_Reporter(object):
                         # use pydicom to write sequence of mask per contour
 
                 except:
-                    print('Failed on {} {} {}'.format(series_dict['PatientID'], series_id, output_path))
+                    print('Failed on {} {}'.format(series_id, output_path))
                 q.task_done()
 
     def run_conversion(self):
