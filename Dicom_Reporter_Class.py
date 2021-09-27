@@ -10,6 +10,8 @@ from tqdm import tqdm
 import numpy as np
 import SimpleITK as sitk
 import gdcm
+import pydicom
+from pydicom.tag import Tag
 
 
 def splitext_(path):
@@ -137,6 +139,16 @@ class Dicom_Reporter(object):
         if self.verbose:
             print("A total of {} folders with DICOM files was found".format(len(self.folders_with_dcm)))
 
+    def rtstruct_reader(self, rtstruct_files=[]):
+        for rtstruct_file in rtstruct_files:
+            try:
+                ds = pydicom.read_file(rtstruct_file)
+            except:
+                print("\n         Dicom cannot be read\n")
+                return
+
+            xxx = 1
+
     def dicom_reader_worker(self, q):
         while True:
             item = q.get()
@@ -148,6 +160,7 @@ class Dicom_Reporter(object):
                 reader.MetaDataDictionaryArrayUpdateOn()
                 reader.LoadPrivateTagsOn()
                 try:
+                    # this support only standard dicom and RTDOSE
                     series_dict = self.series_reader(reader, dicom_folder)
                     for it, series_id in enumerate(series_dict.keys()):
                         if self.dicom_dict.get(series_id) or self.rt_dict.get(series_id) or self.rd_dict.get(series_id):
@@ -157,6 +170,10 @@ class Dicom_Reporter(object):
                         reader.SetFileNames(dicom_filenames)
                         reader.Execute()
                         self.dictionary_creator(series_id, dicom_filenames, reader)
+
+                    # this is to read RTSTRUCT
+                    rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
+                    self.rtstruct_reader(rtstruct_files)
                 except:
                     print('Failed on {}'.format(dicom_folder))
                 q.task_done()

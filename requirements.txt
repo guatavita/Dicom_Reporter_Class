@@ -1,4 +1,5 @@
 tqdm
 numpy
 SimpleITK
+pydicom
 python-gdcm
