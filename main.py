@@ -2,20 +2,14 @@ from Dicom_Reporter_Class import *
 
 
 def main():
-    input_dir = r'C:\Bastien\DICOM_report_test\data'
-    output_dir = os.path.join(input_dir, 'nifti')
+    input_dir = r'C:\Bastien\DICOM\EBRT_database'
+    output_dir = r'C:\Bastien\DICOM\EBRT_database_nifti'
 
     supp_tags = {
-        'MammoDesc': '0055|1001'
     }
 
-    contour_names = ['Bag_Bowel']
+    contour_names = []
     contour_association = {
-        'CTV45_Pelvis Nodes': 'CTVNs',
-        'CTV45_Pelvic Nodes': 'CTVN',
-        'CTV45_Pelvis_Nodes': 'CTVN',
-        'CTVn45': 'CTVN',
-        'ITV45_Uterus/Cervix/Vagina/Parametria': 'ITV45',
     }
     time_start = time.time()
     dicom_explorer = Dicom_Reporter(input_dir=input_dir,

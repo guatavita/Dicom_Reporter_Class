@@ -6,6 +6,7 @@ from threading import Thread
 from multiprocessing import cpu_count
 from queue import *
 
+from pathvalidate import sanitize_filepath
 from tqdm import tqdm
 import numpy as np
 import SimpleITK as sitk
@@ -177,13 +178,16 @@ class Dicom_Reporter(object):
             else:
                 dicom_folder = item
                 reader = sitk.ImageSeriesReader()
+                reader.SetGlobalWarningDisplay(False)
+                reader.SetNumberOfThreads(0)
+                reader.SetNumberOfWorkUnits(0)
                 reader.MetaDataDictionaryArrayUpdateOn()
                 reader.LoadPrivateTagsOn()
                 try:
                     # this support only standard dicom and RTDOSE
                     series_dict = self.series_reader(reader, dicom_folder)
                     for it, series_id in enumerate(series_dict.keys()):
-                        if self.dicom_dict.get(series_id) or self.rt_dict.get(series_id) or self.rd_dict.get(series_id):
+                        if self.dicom_dict.get(series_id) or self.rd_dict.get(series_id):
                             # make sure we don't rerun the same patient series id if previously loaded
                             continue
                         dicom_filenames = reader.GetGDCMSeriesFileNames(dicom_folder, series_id)
@@ -224,6 +228,10 @@ class Dicom_Reporter(object):
                 return
 
             series_id = ds.get('SeriesInstanceUID')
+
+            if self.rt_dict.get(series_id):
+                continue
+
             series_dict = {}
             series_dict['dicom_filenames'] = rtstruct_file
             for tag_name in self.tags_dict.keys():
@@ -293,8 +301,11 @@ class Dicom_Reporter(object):
         :return:
         '''
         reader = sitk.ImageSeriesReader()
-        reader.MetaDataDictionaryArrayUpdateOn()
-        reader.LoadPrivateTagsOn()
+        reader.SetGlobalWarningDisplay(False)
+        reader.SetNumberOfThreads(0)
+        reader.SetNumberOfWorkUnits(0)
+        reader.MetaDataDictionaryArrayUpdateOff()
+        reader.LoadPrivateTagsOff()
         i = 0
         for rtdose_series_id in rtdose_series:
             if not self.rd_dict.get(rtdose_series_id):
@@ -335,33 +346,37 @@ class Dicom_Reporter(object):
         for rtstruct_series_id in rtstruct_series:
             if not self.rt_dict.get(rtstruct_series_id):
                 continue
-            for roi_structset, roi_contour in zip(self.rt_dict[rtstruct_series_id].get('StructureSetROISequence'),
-                                                  self.rt_dict[rtstruct_series_id].get('ROIContourSequence')):
-                roi_name = roi_structset.ROIName
-                if self.contour_names and not self.contour_association.get(roi_name):
-                    continue
+            try:
+                for roi_structset, roi_contour in zip(self.rt_dict[rtstruct_series_id].get('StructureSetROISequence'),
+                                                      self.rt_dict[rtstruct_series_id].get('ROIContourSequence')):
+                    roi_name = roi_structset.ROIName
+                    if self.contour_names and not self.contour_association.get(roi_name):
+                        continue
 
-                if self.contour_association.get(roi_name):
-                    roi_name = self.contour_association.get(roi_name)
+                    if self.contour_association.get(roi_name):
+                        roi_name = self.contour_association.get(roi_name)
 
-                mask = np.zeros(ref_size[::-1], dtype=np.int8)
-                for contour_sequence in roi_contour.ContourSequence:
-                    pts_list = [contour_sequence.ContourData[i:i + 3] for i in
-                                range(0, len(contour_sequence.ContourData), 3)]
-                    pts_array = (np.array(pts_list) - ref_origin) / ref_spacing
-                    slice_mask = cv2.fillPoly(np.zeros(ref_size[:2]), pts=[pts_array[:, :2].astype(np.int32)],
-                                              color=(255, 255, 255))
-                    slice_id = int(pts_array[0, 2])
-                    if np.any(mask[slice_id, :, :][slice_mask > 0]) == 1:
-                        mask[slice_id, :, :][slice_mask > 0] = 0
-                    else:
-                        mask[slice_id, :, :][slice_mask > 0] = 1
+                    mask = np.zeros(ref_size[::-1], dtype=np.int8)
+                    for contour_sequence in roi_contour.ContourSequence:
+                        pts_list = [contour_sequence.ContourData[i:i + 3] for i in
+                                    range(0, len(contour_sequence.ContourData), 3)]
+                        pts_array = (np.array(pts_list) - ref_origin) / ref_spacing
+                        slice_mask = cv2.fillPoly(np.zeros(ref_size[:2]), pts=[pts_array[:, :2].astype(np.int32)],
+                                                  color=(255, 255, 255))
+                        slice_id = int(pts_array[0, 2])
+                        if np.any(mask[slice_id, :, :][slice_mask > 0]) == 1:
+                            mask[slice_id, :, :][slice_mask > 0] = 0
+                        else:
+                            mask[slice_id, :, :][slice_mask > 0] = 1
 
-                mask_handle = sitk.GetImageFromArray(mask)
-                mask_handle.SetDirection(dicom_handle.GetDirection())
-                mask_handle.SetOrigin(ref_origin)
-                mask_handle.SetSpacing(ref_spacing)
-                sitk.WriteImage(mask_handle, os.path.join(output_dir, '{}.nii.gz'.format(roi_name)))
+                    mask_handle = sitk.GetImageFromArray(mask)
+                    mask_handle.SetDirection(dicom_handle.GetDirection())
+                    mask_handle.SetOrigin(ref_origin)
+                    mask_handle.SetSpacing(ref_spacing)
+                    sitk.WriteImage(mask_handle,
+                                    os.path.join(output_dir, '{}.nii.gz'.format(sanitize_filepath(roi_name))))
+            except:
+                print('failed to match rtstruct {}'.format(rtstruct_series_id))
 
     def dicom_writer_worker(self, q):
         while True:
@@ -371,8 +386,11 @@ class Dicom_Reporter(object):
             else:
                 series_id, output_path = item
                 reader = sitk.ImageSeriesReader()
-                reader.MetaDataDictionaryArrayUpdateOn()
-                reader.LoadPrivateTagsOn()
+                reader.SetGlobalWarningDisplay(False)
+                reader.SetNumberOfThreads(0)
+                reader.SetNumberOfWorkUnits(0)
+                reader.MetaDataDictionaryArrayUpdateOff()
+                reader.LoadPrivateTagsOff()
                 try:
                     series_dict = self.dicom_dict[series_id]
                     series_description = series_dict['SeriesDescription'].rstrip().replace(' ', '_')
