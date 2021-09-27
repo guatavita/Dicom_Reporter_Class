@@ -1,8 +1,8 @@
 # Dicom_Reporter_Class
 
-This class is a DICOM listener that will create a report of all the dicom seriesID/patientID in the output directory as well as possibibly convert them to nifti images.
+This class is a DICOM listener that will create a report of all the dicom seriesID/patientID in the output directory as well as possibibly convert them to NIfTI images.
 
-The ".run_conversion()" command line supports CT/MR/MG DICOM, RTDOSE DICOM and RTSTRUCT DICOM.
+The ".run_conversion()" command line supports CT/MR/MG modalities, RTDOSE and RTSTRUCT DICOM formats. Other modalities may be supported by not tested.
 
 This class support unorganized DICOM data as each study will be matched by their "StudyInstanceUID"
 
