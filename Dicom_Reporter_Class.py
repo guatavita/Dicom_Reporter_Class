@@ -64,7 +64,6 @@ class Dicom_Reporter(object):
         self.save_dcm_report()
 
     def create_association(self):
-        # TODO merge rt_dict to dicom_dict for each series
         # merging rdstruct to the corresponding study instance uid of the images
         for rd_series_key in tqdm(self.rd_dict.keys()):
             rd_study_instance_uid = self.rd_dict[rd_series_key]['StudyInstanceUID']
@@ -79,6 +78,21 @@ class Dicom_Reporter(object):
                         self.dicom_dict[dcm_series_key]['RTDOSE'] = []
                     if rd_series_key not in self.dicom_dict[dcm_series_key]['RTDOSE']:
                         self.dicom_dict[dcm_series_key]['RTDOSE'].append(rd_series_key)
+
+        # merging rtstruct to the corresponding study instance uid of the images
+        for rt_series_key in tqdm(self.rt_dict.keys()):
+            rt_study_instance_uid = self.rt_dict[rt_series_key]['StudyInstanceUID']
+            if not rt_study_instance_uid:
+                continue
+            for dcm_series_key in self.dicom_dict.keys():
+                dcm_study_instance_uid = self.dicom_dict[dcm_series_key]['StudyInstanceUID']
+                if not dcm_study_instance_uid:
+                    continue
+                if dcm_study_instance_uid == rt_study_instance_uid:
+                    if not self.dicom_dict[dcm_series_key].get('RTSTRUCT'):
+                        self.dicom_dict[dcm_series_key]['RTSTRUCT'] = []
+                    if rt_series_key not in self.dicom_dict[dcm_series_key]['RTSTRUCT']:
+                        self.dicom_dict[dcm_series_key]['RTSTRUCT'].append(rt_series_key)
 
     def force_update(self):
         self.walk_main_directory()
@@ -102,13 +116,14 @@ class Dicom_Reporter(object):
         tags = {
             'SOPClassUID': '0008|0016',
             'StudyInstanceUID': '0020|000d',
+            'StudyDescription': '0008|1030',
             'StudyDate': '0008|0020',
+            'SeriesInstanceUID': '0020|000e',
+            'SeriesDescription': '0008|103e',
             'SeriesDate': '0008|0021',
             'Modality': '0008|0060',
             'Manufacturer': '0008|0070',
             'InstitutionName': '0008|0080',
-            'StudyDescription': '0008|1030',
-            'SeriesDescription': '0008|103e',
             'VolumeBasedCalculationTechnique': '0008|9207',
             'PresentationIntentType': '0008|0068',
             'PatientName': '0010|0010',
@@ -122,7 +137,10 @@ class Dicom_Reporter(object):
             'SpacingBetweenSlices': '0018|0088',
             'DoseGridScaling': '3004|000e',
             'DoseSummationType': '3004|000a',
+            'ROIContourSequence': '3006|0039',
+            'StructureSetROISequence': '3006|0020',
         }
+
         try:
             if list(supp_tags.keys()):
                 tags.update(supp_tags)
@@ -138,16 +156,6 @@ class Dicom_Reporter(object):
 
         if self.verbose:
             print("A total of {} folders with DICOM files was found".format(len(self.folders_with_dcm)))
-
-    def rtstruct_reader(self, rtstruct_files=[]):
-        for rtstruct_file in rtstruct_files:
-            try:
-                ds = pydicom.read_file(rtstruct_file)
-            except:
-                print("\n         Dicom cannot be read\n")
-                return
-
-            xxx = 1
 
     def dicom_reader_worker(self, q):
         while True:
@@ -195,6 +203,25 @@ class Dicom_Reporter(object):
         for t in threads:
             t.join()
 
+    def rtstruct_reader(self, rtstruct_files=[]):
+        for rtstruct_file in rtstruct_files:
+            try:
+                ds = pydicom.read_file(rtstruct_file)
+            except:
+                print("\n         Dicom cannot be read\n")
+                return
+
+            series_id = ds.get('SeriesInstanceUID')
+            series_dict = {}
+            series_dict['dicom_filenames'] = rtstruct_file
+            for tag_name in self.tags_dict.keys():
+                tag_key = self.tags_dict.get(tag_name)
+                if not tag_key:
+                    continue
+                series_dict[tag_name] = ds.get(tag_name)
+
+            self.rt_dict[series_id] = series_dict
+
     def dictionary_creator(self, series_id, dicom_filenames, reader):
         slice_id = 0
         series_dict = {}
@@ -205,9 +232,7 @@ class Dicom_Reporter(object):
             modality = 'Unknown'
 
         # these are pointer they link to the dict content in memory
-        if modality.lower() == 'rtstruct':
-            out_dict = self.rt_dict
-        elif modality.lower() == 'rtdose':
+        if modality.lower() == 'rtdose':
             out_dict = self.rd_dict
         else:
             out_dict = self.dicom_dict
@@ -324,12 +349,15 @@ class Dicom_Reporter(object):
                     sitk.WriteImage(dicom_handle, output_filename)
 
                     if series_dict.get('RTDOSE'):
-                        self.dose_writer(output_dir=output_dir, rtdose_series=series_dict['RTDOSE'], dicom_handle=dicom_handle)
+                        self.dose_writer(output_dir=output_dir, rtdose_series=series_dict['RTDOSE'],
+                                         dicom_handle=dicom_handle)
 
                     # TODO use pydicom to write RTstruct
                     if series_dict.get('RTSTRUCT'):
-                        xxx = 1
-                        # use pydicom to write sequence of mask per contour
+                        for rtstruct_series_id in series_dict['RTSTRUCT']:
+                            if not self.rd_dict.get(rtstruct_series_id):
+                                continue
+                            rtdose_filenames = self.rd_dict[rtstruct_series_id]['dicom_filenames']
 
                 except:
                     print('Failed on {} {}'.format(series_id, output_path))
