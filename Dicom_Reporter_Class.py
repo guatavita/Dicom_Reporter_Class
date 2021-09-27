@@ -32,10 +32,11 @@ class Dicom_Reporter(object):
         :param verbose:
         '''
 
-        # TODO add rtdose_dict and manage merging between images and RTs using sITK
         # TODO add rtstruct_dict and manage merging between images and RTs using pydicom
-        # TODO add writer dose and writer RT in respective output dir
+        # TODO add writer RT in respective output dir
         # TODO create a separate function for image_writer, rtdose_writer, rtstruct_writer
+        # TODO create dicom_report in excel sheet?
+        # TODO remove series_id in output file name
 
         self.input_dir = input_dir
         self.output_dir = output_dir
@@ -230,12 +231,18 @@ class Dicom_Reporter(object):
         resampler.SetReferenceImage(fixed)
         return resampler.Execute(moving)
 
-    def dose_writer(self, output_dir, rtdose_series={}, dicom_handle=None):
+    def dose_writer(self, output_dir, rtdose_series=[], dicom_handle=None):
+        '''
+        :param output_dir: output directory
+        :param rtdose_series: list of RTDOSE id to point toward the dictionary in RTdose
+        :param dicom_handle: reference dicom to resample RTDOSE if available
+        :return:
+        '''
         reader = sitk.ImageSeriesReader()
         reader.MetaDataDictionaryArrayUpdateOn()
         reader.LoadPrivateTagsOn()
         i = 0
-        for rtdose_series_id in rtdose_series['RTDOSE']:
+        for rtdose_series_id in rtdose_series:
             if not self.rd_dict.get(rtdose_series_id):
                 continue
             rtdose_filenames = self.rd_dict[rtdose_series_id]['dicom_filenames']
@@ -243,8 +250,9 @@ class Dicom_Reporter(object):
             dose_handle = reader.Execute()
             origin = dose_handle.GetOrigin()
             spacing = dose_handle.GetSpacing()
-            dose_array = np.squeeze(sitk.GetArrayFromImage(dose_handle))
-            dose_array = dose_array * float(self.rd_dict[rtdose_series_id]['DoseGridScaling'])
+            dose_array = np.squeeze(sitk.GetArrayFromImage(dose_handle).astype(np.float32))
+            if self.rd_dict[rtdose_series_id]['DoseGridScaling']:
+                dose_array = dose_array * float(self.rd_dict[rtdose_series_id]['DoseGridScaling'])
             if len(dose_array.shape) > 3:
                 for c in range(dose_array.shape[0]):
                     dose_handle = sitk.GetImageFromArray(dose_array[c])
@@ -253,7 +261,7 @@ class Dicom_Reporter(object):
                     if dicom_handle:
                         dose_handle = self.resampler(fixed=dicom_handle, moving=dose_handle)
                     sitk.WriteImage(dose_handle,
-                                    os.path.join(output_dir, 'dose_{}_{}_{}_'.format(i, self.rd_dict[
+                                    os.path.join(output_dir, 'dose_{}_{}_{}.nii.gz'.format(i, self.rd_dict[
                                         rtdose_series_id]['DoseSummationType'], c)))
             else:
                 dose_handle = sitk.GetImageFromArray(dose_array)
@@ -262,7 +270,7 @@ class Dicom_Reporter(object):
                 if dicom_handle:
                     dose_handle = self.resampler(fixed=dicom_handle, moving=dose_handle)
                 sitk.WriteImage(dose_handle,
-                                os.path.join(output_dir, 'dose_{}_{}'.format(i, self.rd_dict[
+                                os.path.join(output_dir, 'dose_{}_{}.nii.gz'.format(i, self.rd_dict[
                                     rtdose_series_id]['DoseSummationType'])))
             i += 1
 
@@ -299,7 +307,7 @@ class Dicom_Reporter(object):
                     sitk.WriteImage(dicom_handle, output_filename)
 
                     if series_dict.get('RTDOSE'):
-                        self.dose_writer(output_dir=output_dir, rtdose_series=series_dict['RTDOSE'])
+                        self.dose_writer(output_dir=output_dir, rtdose_series=series_dict['RTDOSE'], dicom_handle=dicom_handle)
 
                     # TODO use pydicom to write RTstruct
                     if series_dict.get('RTSTRUCT'):
