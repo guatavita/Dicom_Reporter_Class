@@ -15,6 +15,33 @@ import pydicom
 from pydicom.tag import Tag
 import cv2
 
+tags = {
+    'SOPClassUID': '0008|0016',
+    'StudyInstanceUID': '0020|000d',
+    'StudyDescription': '0008|1030',
+    'StudyDate': '0008|0020',
+    'SeriesInstanceUID': '0020|000e',
+    'SeriesDescription': '0008|103e',
+    'SeriesDate': '0008|0021',
+    'Modality': '0008|0060',
+    'Manufacturer': '0008|0070',
+    'InstitutionName': '0008|0080',
+    'VolumeBasedCalculationTechnique': '0008|9207',
+    'PresentationIntentType': '0008|0068',
+    'PatientName': '0010|0010',
+    'PatientID': '0010|0020',
+    'PatientBirthDate': '0010|0030',
+    'PatientAge': '0010|1010',
+    'PatientSex': '0010|0040',
+    'BodyPartExamined': '0018|0015',
+    'ProtocolName': '0018|1030',
+    'SliceThickness': '0018|0050',
+    'SpacingBetweenSlices': '0018|0088',
+    'DoseGridScaling': '3004|000e',
+    'DoseSummationType': '3004|000a',
+    'ROIContourSequence': '3006|0039',
+    'StructureSetROISequence': '3006|0020',
+}
 
 def splitext_(path):
     if len(path.split('.')) > 2:
@@ -126,34 +153,6 @@ class Dicom_Reporter(object):
                 json.dump(self.dicom_dict, f)
 
     def set_tags(self, supp_tags):
-        tags = {
-            'SOPClassUID': '0008|0016',
-            'StudyInstanceUID': '0020|000d',
-            'StudyDescription': '0008|1030',
-            'StudyDate': '0008|0020',
-            'SeriesInstanceUID': '0020|000e',
-            'SeriesDescription': '0008|103e',
-            'SeriesDate': '0008|0021',
-            'Modality': '0008|0060',
-            'Manufacturer': '0008|0070',
-            'InstitutionName': '0008|0080',
-            'VolumeBasedCalculationTechnique': '0008|9207',
-            'PresentationIntentType': '0008|0068',
-            'PatientName': '0010|0010',
-            'PatientID': '0010|0020',
-            'PatientBirthDate': '0010|0030',
-            'PatientAge': '0010|1010',
-            'PatientSex': '0010|0040',
-            'BodyPartExamined': '0018|0015',
-            'ProtocolName': '0018|1030',
-            'SliceThickness': '0018|0050',
-            'SpacingBetweenSlices': '0018|0088',
-            'DoseGridScaling': '3004|000e',
-            'DoseSummationType': '3004|000a',
-            'ROIContourSequence': '3006|0039',
-            'StructureSetROISequence': '3006|0020',
-        }
-
         try:
             if list(supp_tags.keys()):
                 tags.update(supp_tags)
