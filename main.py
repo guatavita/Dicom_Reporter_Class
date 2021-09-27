@@ -2,17 +2,24 @@ from Dicom_Reporter_Class import *
 
 
 def main():
-    root = r'Z:\Morfeus'
-    input_dir = os.path.join(root, r'Bastien\DICOM\DICOM_report_test\data')
+    input_dir = r'C:\Bastien\DICOM_report_test\data'
     output_dir = os.path.join(input_dir, 'nifti')
 
     supp_tags = {
         'MammoDesc': '0055|1001'
     }
 
+    contour_names = ['CTVN']
+    contour_association = {
+        'CTV45_Pelvis Nodes': 'CTVN',
+        'CTV45_Pelvis_Nodes': 'CTVN',
+        'CTVn45': 'CTVN',
+    }
     time_start = time.time()
     dicom_explorer = Dicom_Reporter(input_dir=input_dir,
                                     output_dir=output_dir,
+                                    contour_names=contour_names,
+                                    contour_association=contour_association,
                                     force_rewrite=True,
                                     save_json=True,
                                     load_json=True,

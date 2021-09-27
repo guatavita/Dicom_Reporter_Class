@@ -12,6 +12,8 @@ import SimpleITK as sitk
 import gdcm
 import pydicom
 from pydicom.tag import Tag
+import cv2
+from Plot_And_Scroll_Images.Plot_Scroll_Images import plot_scroll_Image
 
 
 def splitext_(path):
@@ -21,11 +23,14 @@ def splitext_(path):
 
 
 class Dicom_Reporter(object):
-    def __init__(self, input_dir, output_dir=None, force_rewrite=False, save_json=True, load_json=True,
+    def __init__(self, input_dir, output_dir=None, contour_names=[], contour_association={}, force_rewrite=False,
+                 save_json=True, load_json=True,
                  supp_tags={}, nb_threads=int(0.5 * cpu_count()), verbose=False):
         '''
         :param input_dir:
         :param output_dir:
+        :param contour_names:
+        :param contour_association:
         :param force_rewrite:
         :param save_json:
         :param load_json:
@@ -34,9 +39,6 @@ class Dicom_Reporter(object):
         :param verbose:
         '''
 
-        # TODO add rtstruct_dict and manage merging between images and RTs using pydicom
-        # TODO add writer RT in respective output dir
-        # TODO create a separate function for image_writer, rtdose_writer, rtstruct_writer
         # TODO create dicom_report in excel sheet?
         # TODO remove series_id in output file name
 
@@ -45,6 +47,8 @@ class Dicom_Reporter(object):
         self.dicom_dict = {}
         self.rt_dict = {}
         self.rd_dict = {}
+        self.contour_names = contour_names
+        self.contour_association = contour_association
         self.force_rewrite = force_rewrite
         self.set_tags(supp_tags)
         self.nb_threads = min(nb_threads, cpu_count())
@@ -62,6 +66,11 @@ class Dicom_Reporter(object):
         self.dicom_explorer()
         self.create_association()
         self.save_dcm_report()
+
+    def create_contour_association(self):
+        if self.contour_names:
+            for contour_name in self.contour_association.keys():
+                self.contour_association[contour_name.lower()] = self.contour_association.get(contour_name)
 
     def create_association(self):
         # merging rdstruct to the corresponding study instance uid of the images
@@ -273,7 +282,7 @@ class Dicom_Reporter(object):
         resampler.SetReferenceImage(fixed)
         return resampler.Execute(moving)
 
-    def dose_writer(self, output_dir, rtdose_series=[], dicom_handle=None):
+    def rtdose_writer(self, output_dir, rtdose_series=[], dicom_handle=None):
         '''
         :param output_dir: output directory
         :param rtdose_series: list of RTDOSE id to point toward the dictionary in RTdose
@@ -316,6 +325,36 @@ class Dicom_Reporter(object):
                                     rtdose_series_id]['DoseSummationType'])))
             i += 1
 
+    def rtstruct_writer(self, output_dir, dicom_handle, rtstruct_series=[], ):
+        ref_size = dicom_handle.GetSize()
+        ref_origin = dicom_handle.GetOrigin()
+        ref_spacing = dicom_handle.GetSpacing()
+        for rtstruct_series_id in rtstruct_series:
+            if not self.rt_dict.get(rtstruct_series_id):
+                continue
+
+            for roi_structset, roi_contour in zip(self.rt_dict[rtstruct_series_id].get('StructureSetROISequence'),
+                                                  self.rt_dict[rtstruct_series_id].get('ROIContourSequence')):
+                roi_name = roi_structset.ROIName
+                if self.contour_names and not self.contour_association.get(roi_name):
+                    continue
+
+                mask = np.zeros(ref_size[::-1], dtype=np.int8)
+                for contour_sequence in roi_contour.ContourSequence:
+                    pts_list = [contour_sequence.ContourData[i:i + 3] for i in
+                                range(0, len(contour_sequence.ContourData), 3)]
+                    pts_array = (np.array(pts_list) - ref_origin) / ref_spacing
+                    slice_mask = cv2.fillPoly(np.zeros(ref_size[:2]), pts=[pts_array[:, :2].astype(np.int32)],
+                                              color=(255, 255, 255))
+                    slice_id = int(pts_array[0, 2])
+                    mask[slice_id, :, :][slice_mask > 0] = 1
+
+                mask_handle = sitk.GetImageFromArray(mask)
+                mask_handle.SetDirection(dicom_handle.GetDirection())
+                mask_handle.SetOrigin(ref_origin)
+                mask_handle.SetSpacing(ref_spacing)
+                sitk.WriteImage(mask_handle, os.path.join(output_dir, '{}.nii.gz'.format(roi_name)))
+
     def dicom_writer_worker(self, q):
         while True:
             item = q.get()
@@ -349,15 +388,12 @@ class Dicom_Reporter(object):
                     sitk.WriteImage(dicom_handle, output_filename)
 
                     if series_dict.get('RTDOSE'):
-                        self.dose_writer(output_dir=output_dir, rtdose_series=series_dict['RTDOSE'],
-                                         dicom_handle=dicom_handle)
+                        self.rtdose_writer(output_dir=output_dir, rtdose_series=series_dict['RTDOSE'],
+                                           dicom_handle=dicom_handle)
 
-                    # TODO use pydicom to write RTstruct
                     if series_dict.get('RTSTRUCT'):
-                        for rtstruct_series_id in series_dict['RTSTRUCT']:
-                            if not self.rd_dict.get(rtstruct_series_id):
-                                continue
-                            rtdose_filenames = self.rd_dict[rtstruct_series_id]['dicom_filenames']
+                        self.rtstruct_writer(output_dir=output_dir, dicom_handle=dicom_handle,
+                                             rtstruct_series=series_dict['RTSTRUCT'])
 
                 except:
                     print('Failed on {} {}'.format(series_id, output_path))
