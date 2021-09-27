@@ -9,11 +9,13 @@ def main():
         'MammoDesc': '0055|1001'
     }
 
-    contour_names = ['CTVN']
+    contour_names = ['Bag_Bowel']
     contour_association = {
-        'CTV45_Pelvis Nodes': 'CTVN',
+        'CTV45_Pelvis Nodes': 'CTVNs',
+        'CTV45_Pelvic Nodes': 'CTVN',
         'CTV45_Pelvis_Nodes': 'CTVN',
         'CTVn45': 'CTVN',
+        'ITV45_Uterus/Cervix/Vagina/Parametria': 'ITV45',
     }
     time_start = time.time()
     dicom_explorer = Dicom_Reporter(input_dir=input_dir,

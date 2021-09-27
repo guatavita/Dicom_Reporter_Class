@@ -24,19 +24,18 @@ def splitext_(path):
 
 class Dicom_Reporter(object):
     def __init__(self, input_dir, output_dir=None, contour_names=[], contour_association={}, force_rewrite=False,
-                 save_json=True, load_json=True,
-                 supp_tags={}, nb_threads=int(0.5 * cpu_count()), verbose=False):
+                 save_json=True, load_json=True, supp_tags={}, nb_threads=int(0.5 * cpu_count()), verbose=False):
         '''
-        :param input_dir:
-        :param output_dir:
-        :param contour_names:
-        :param contour_association:
-        :param force_rewrite:
-        :param save_json:
-        :param load_json:
-        :param supp_tags:
-        :param nb_threads:
-        :param verbose:
+        :param input_dir: input folder where (unorganized) dicom can be found
+        :param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\StudyDate\SeriesDescription
+        :param contour_names: list of contour names that will be written, ALL if empty
+        :param contour_association: dictionary of contour names association
+        :param force_rewrite: for rewrite of NIfTI images (user should remove dcm_report.json)
+        :param save_json: save dcm_report.json in output_dir
+        :param load_json: reload previous dcm_report.json
+        :param supp_tags: extract DICOM metadata for in-house usage
+        :param nb_threads: nb_thread to run processes in multithreads
+        :param verbose: True to have output prints
         '''
 
         # TODO create dicom_report in excel sheet?
@@ -61,6 +60,7 @@ class Dicom_Reporter(object):
         self.folders_with_dcm = []
 
         # class init
+        self.create_contour_association()
         self.load_dcm_report()
         self.walk_main_directory()
         self.dicom_explorer()
@@ -69,12 +69,16 @@ class Dicom_Reporter(object):
 
     def create_contour_association(self):
         if self.contour_names:
-            for contour_name in self.contour_association.keys():
+            for contour_name in self.contour_names:
+                if not self.contour_association.get(contour_name):
+                    self.contour_association[contour_name] = contour_name
+
+            for contour_name in list(self.contour_association.keys()):
                 self.contour_association[contour_name.lower()] = self.contour_association.get(contour_name)
 
     def create_association(self):
         # merging rdstruct to the corresponding study instance uid of the images
-        for rd_series_key in tqdm(self.rd_dict.keys()):
+        for rd_series_key in tqdm(self.rd_dict.keys(), desc='Merging RTDOSE'):
             rd_study_instance_uid = self.rd_dict[rd_series_key]['StudyInstanceUID']
             if not rd_study_instance_uid:
                 continue
@@ -89,7 +93,7 @@ class Dicom_Reporter(object):
                         self.dicom_dict[dcm_series_key]['RTDOSE'].append(rd_series_key)
 
         # merging rtstruct to the corresponding study instance uid of the images
-        for rt_series_key in tqdm(self.rt_dict.keys()):
+        for rt_series_key in tqdm(self.rt_dict.keys(), desc='Merging RTSTRUCT'):
             rt_study_instance_uid = self.rt_dict[rt_series_key]['StudyInstanceUID']
             if not rt_study_instance_uid:
                 continue
@@ -115,7 +119,7 @@ class Dicom_Reporter(object):
                     self.dicom_dict = json.load(f)
 
     def save_dcm_report(self):
-        if self.save_json:
+        if self.save_json and self.output_dir:
             if not os.path.exists(self.output_dir):
                 os.makedirs(self.output_dir)
             with open(self.dcm_report_path, 'w') as f:
@@ -203,7 +207,7 @@ class Dicom_Reporter(object):
             t.start()
             threads.append(t)
 
-        for dicom_folder in tqdm(self.folders_with_dcm):
+        for dicom_folder in tqdm(self.folders_with_dcm, desc='Reading DICOM'):
             item = dicom_folder
             q.put(item)
 
@@ -325,19 +329,21 @@ class Dicom_Reporter(object):
                                     rtdose_series_id]['DoseSummationType'])))
             i += 1
 
-    def rtstruct_writer(self, output_dir, dicom_handle, rtstruct_series=[], ):
+    def rtstruct_writer(self, output_dir, dicom_handle, rtstruct_series=[]):
         ref_size = dicom_handle.GetSize()
         ref_origin = dicom_handle.GetOrigin()
         ref_spacing = dicom_handle.GetSpacing()
         for rtstruct_series_id in rtstruct_series:
             if not self.rt_dict.get(rtstruct_series_id):
                 continue
-
             for roi_structset, roi_contour in zip(self.rt_dict[rtstruct_series_id].get('StructureSetROISequence'),
                                                   self.rt_dict[rtstruct_series_id].get('ROIContourSequence')):
                 roi_name = roi_structset.ROIName
                 if self.contour_names and not self.contour_association.get(roi_name):
                     continue
+
+                if self.contour_association.get(roi_name):
+                    roi_name = self.contour_association.get(roi_name)
 
                 mask = np.zeros(ref_size[::-1], dtype=np.int8)
                 for contour_sequence in roi_contour.ContourSequence:
@@ -347,7 +353,10 @@ class Dicom_Reporter(object):
                     slice_mask = cv2.fillPoly(np.zeros(ref_size[:2]), pts=[pts_array[:, :2].astype(np.int32)],
                                               color=(255, 255, 255))
                     slice_id = int(pts_array[0, 2])
-                    mask[slice_id, :, :][slice_mask > 0] = 1
+                    if np.any(mask[slice_id, :, :][slice_mask > 0]) == 1:
+                        mask[slice_id, :, :][slice_mask > 0] = 0
+                    else:
+                        mask[slice_id, :, :][slice_mask > 0] = 1
 
                 mask_handle = sitk.GetImageFromArray(mask)
                 mask_handle.SetDirection(dicom_handle.GetDirection())
@@ -410,7 +419,7 @@ class Dicom_Reporter(object):
             t.start()
             threads.append(t)
 
-        for series_id in tqdm(self.dicom_dict.keys()):
+        for series_id in tqdm(self.dicom_dict.keys(), desc='Converting DICOM to NIfTI'):
             output_path = os.path.join(self.output_dir, self.dicom_dict[series_id]['PatientID'].rstrip())
 
             if not os.path.exists(output_path):
