@@ -13,7 +13,6 @@ import gdcm
 import pydicom
 from pydicom.tag import Tag
 import cv2
-from Plot_And_Scroll_Images.Plot_Scroll_Images import plot_scroll_Image
 
 
 def splitext_(path):
