@@ -1,18 +1,14 @@
-import os, sys, shutil, glob
+import os, glob
 import json
-import time
-
 from threading import Thread
 from multiprocessing import cpu_count
 from queue import *
-
 from pathvalidate import sanitize_filepath
 from tqdm import tqdm
 import numpy as np
 import SimpleITK as sitk
 import gdcm
 import pydicom
-from pydicom.tag import Tag
 import cv2
 
 tags = {

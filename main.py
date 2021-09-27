@@ -1,5 +1,5 @@
+import time
 from Dicom_Reporter_Class import *
-
 
 def main():
     input_dir = r'C:\Bastien\DICOM\EBRT_database'
