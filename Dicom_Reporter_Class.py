@@ -4,7 +4,6 @@ from threading import Thread
 from multiprocessing import cpu_count
 from queue import *
 from pathvalidate import sanitize_filepath
-from tqdm import tqdm
 import numpy as np
 import SimpleITK as sitk
 import gdcm
@@ -39,6 +38,7 @@ tags = {
     'StructureSetROISequence': '3006|0020',
 }
 
+
 def splitext_(path):
     if len(path.split('.')) > 2:
         return path.split('.')[0], '.'.join(path.split('.')[-2:])
@@ -63,6 +63,9 @@ class Dicom_Reporter(object):
 
         # TODO create dicom_report in excel sheet?
         # TODO remove series_id in output file name
+        # TODO use pydicom for the dicom_reader_worker? (could be faster without loading the pixel data)
+        # TODO evaluate memory usage
+        # TODO evaluate how the ROIsequence are in the json
 
         self.input_dir = input_dir
         self.output_dir = output_dir
@@ -100,12 +103,15 @@ class Dicom_Reporter(object):
                 self.contour_association[contour_name.lower()] = self.contour_association.get(contour_name)
 
     def create_association(self):
+
+        if self.verbose:
+            print("Merging RTDOSE:")
         # merging rdstruct to the corresponding study instance uid of the images
-        for rd_series_key in tqdm(self.rd_dict.keys(), desc='Merging RTDOSE'):
+        for rd_series_key in list(self.rd_dict.keys()):
             rd_study_instance_uid = self.rd_dict[rd_series_key]['StudyInstanceUID']
             if not rd_study_instance_uid:
                 continue
-            for dcm_series_key in self.dicom_dict.keys():
+            for dcm_series_key in list(self.dicom_dict.keys()):
                 dcm_study_instance_uid = self.dicom_dict[dcm_series_key]['StudyInstanceUID']
                 if not dcm_study_instance_uid:
                     continue
@@ -115,12 +121,14 @@ class Dicom_Reporter(object):
                     if rd_series_key not in self.dicom_dict[dcm_series_key]['RTDOSE']:
                         self.dicom_dict[dcm_series_key]['RTDOSE'].append(rd_series_key)
 
+        if self.verbose:
+            print("Merging RTSTRUCT:")
         # merging rtstruct to the corresponding study instance uid of the images
-        for rt_series_key in tqdm(self.rt_dict.keys(), desc='Merging RTSTRUCT'):
+        for rt_series_key in list(self.rt_dict.keys()):
             rt_study_instance_uid = self.rt_dict[rt_series_key]['StudyInstanceUID']
             if not rt_study_instance_uid:
                 continue
-            for dcm_series_key in self.dicom_dict.keys():
+            for dcm_series_key in list(self.dicom_dict.keys()):
                 dcm_study_instance_uid = self.dicom_dict[dcm_series_key]['StudyInstanceUID']
                 if not dcm_study_instance_uid:
                     continue
@@ -158,6 +166,8 @@ class Dicom_Reporter(object):
         self.tags_dict = tags
 
     def walk_main_directory(self):
+        if self.verbose:
+            print("Looking for DICOM:")
         for root, dirs, files in os.walk(self.input_dir, topdown=False):
             if glob.glob(os.path.join(root, '*.dcm')):
                 self.folders_with_dcm.append(root)
@@ -174,14 +184,12 @@ class Dicom_Reporter(object):
                 dicom_folder = item
                 reader = sitk.ImageSeriesReader()
                 reader.SetGlobalWarningDisplay(False)
-                reader.SetNumberOfThreads(0)
-                reader.SetNumberOfWorkUnits(0)
                 reader.MetaDataDictionaryArrayUpdateOn()
                 reader.LoadPrivateTagsOn()
                 try:
                     # this support only standard dicom and RTDOSE
-                    series_dict = self.series_reader(reader, dicom_folder)
-                    for it, series_id in enumerate(series_dict.keys()):
+                    series_ids_list = self.series_reader(reader, dicom_folder, get_filenames=False)
+                    for it, series_id in enumerate(series_ids_list):
                         if self.dicom_dict.get(series_id) or self.rd_dict.get(series_id):
                             # make sure we don't rerun the same patient series id if previously loaded
                             continue
@@ -205,7 +213,9 @@ class Dicom_Reporter(object):
             t.start()
             threads.append(t)
 
-        for dicom_folder in tqdm(self.folders_with_dcm, desc='Reading DICOM'):
+        if self.verbose:
+            print("Reading dicom:")
+        for dicom_folder in self.folders_with_dcm:
             item = dicom_folder
             q.put(item)
 
@@ -229,7 +239,7 @@ class Dicom_Reporter(object):
 
             series_dict = {}
             series_dict['dicom_filenames'] = rtstruct_file
-            for tag_name in self.tags_dict.keys():
+            for tag_name in list(self.tags_dict.keys()):
                 tag_key = self.tags_dict.get(tag_name)
                 if not tag_key:
                     continue
@@ -252,7 +262,7 @@ class Dicom_Reporter(object):
         else:
             out_dict = self.dicom_dict
 
-        for tag_name in self.tags_dict.keys():
+        for tag_name in list(self.tags_dict.keys()):
             tag_key = self.tags_dict.get(tag_name)
             if not tag_key:
                 continue
@@ -266,27 +276,26 @@ class Dicom_Reporter(object):
 
         out_dict[series_id] = series_dict
 
-    def series_reader(self, reader, input_folder):
+    def series_reader(self, reader, input_folder, get_filenames=False):
         '''
         :param input_folder:
         :return: dictionarry of the series ID per dicom
         '''
-        series_ids = reader.GetGDCMSeriesIDs(input_folder)
-        series_dict = {}
-        for series_id in series_ids:
-            series_dict[series_id] = reader.GetGDCMSeriesFileNames(input_folder, series_id)
-        if self.verbose:
-            if len(series_dict.keys()) > 1:
-                print("Warning: More than one series ids were found")
-            elif len(series_dict.keys()) == 0:
-                print("Warning: NO series ids were found")
-        return series_dict
+        series_ids_list = reader.GetGDCMSeriesIDs(input_folder)
 
-    def resampler(self, fixed, moving):
-        resampler = sitk.ResampleImageFilter()
-        resampler.SetNumberOfThreads(0)
-        resampler.SetReferenceImage(fixed)
-        return resampler.Execute(moving)
+        if self.verbose:
+            if len(series_ids_list) > 1:
+                print("Warning: More than one series ids were found")
+            elif len(series_ids_list) == 0:
+                print("Warning: NO series ids were found")
+
+        if get_filenames:
+            series_dict = {}
+            for series_id in series_ids_list:
+                series_dict[series_id] = reader.GetGDCMSeriesFileNames(input_folder, series_id)
+            return series_dict
+        else:
+            return series_ids_list
 
     def rtdose_writer(self, output_dir, rtdose_series=[], dicom_handle=None):
         '''
@@ -297,16 +306,13 @@ class Dicom_Reporter(object):
         '''
         reader = sitk.ImageSeriesReader()
         reader.SetGlobalWarningDisplay(False)
-        reader.SetNumberOfThreads(0)
-        reader.SetNumberOfWorkUnits(0)
         reader.MetaDataDictionaryArrayUpdateOff()
         reader.LoadPrivateTagsOff()
         i = 0
         for rtdose_series_id in rtdose_series:
             if not self.rd_dict.get(rtdose_series_id):
                 continue
-            rtdose_filenames = self.rd_dict[rtdose_series_id]['dicom_filenames']
-            reader.SetFileNames(rtdose_filenames)
+            reader.SetFileNames(self.rd_dict[rtdose_series_id]['dicom_filenames'])
             dose_handle = reader.Execute()
             origin = dose_handle.GetOrigin()
             spacing = dose_handle.GetSpacing()
@@ -319,7 +325,7 @@ class Dicom_Reporter(object):
                     dose_handle.SetOrigin(origin[:3])
                     dose_handle.SetSpacing(spacing[:3])
                     if dicom_handle:
-                        dose_handle = self.resampler(fixed=dicom_handle, moving=dose_handle)
+                        dose_handle = sitk.Resample(dose_handle, dicom_handle)
                     sitk.WriteImage(dose_handle,
                                     os.path.join(output_dir, 'dose_{}_{}_{}.nii.gz'.format(i, self.rd_dict[
                                         rtdose_series_id]['DoseSummationType'], c)))
@@ -328,7 +334,7 @@ class Dicom_Reporter(object):
                 dose_handle.SetOrigin(origin[:3])
                 dose_handle.SetSpacing(spacing[:3])
                 if dicom_handle:
-                    dose_handle = self.resampler(fixed=dicom_handle, moving=dose_handle)
+                    dose_handle = sitk.Resample(dose_handle, dicom_handle)
                 sitk.WriteImage(dose_handle,
                                 os.path.join(output_dir, 'dose_{}_{}.nii.gz'.format(i, self.rd_dict[
                                     rtdose_series_id]['DoseSummationType'])))
@@ -382,18 +388,16 @@ class Dicom_Reporter(object):
                 series_id, output_path = item
                 reader = sitk.ImageSeriesReader()
                 reader.SetGlobalWarningDisplay(False)
-                reader.SetNumberOfThreads(0)
-                reader.SetNumberOfWorkUnits(0)
                 reader.MetaDataDictionaryArrayUpdateOff()
                 reader.LoadPrivateTagsOff()
                 try:
-                    series_dict = self.dicom_dict[series_id]
-                    series_description = series_dict['SeriesDescription'].rstrip().replace(' ', '_')
+                    series_description = self.dicom_dict[series_id]['SeriesDescription'].rstrip().replace(' ', '_')
                     series_description = ''.join(e for e in series_description if e.isalnum() or e == '_')
-                    if series_dict['PresentationIntentType']:
-                        series_description += '_{}'.format(series_dict['PresentationIntentType'].replace(' ', '_'))
+                    if self.dicom_dict[series_id]['PresentationIntentType']:
+                        series_description += '_{}'.format(
+                            self.dicom_dict[series_id]['PresentationIntentType'].replace(' ', '_'))
                     output_dir = os.path.join(output_path,
-                                              '{}'.format(series_dict['StudyDate']),
+                                              '{}'.format(self.dicom_dict[series_id]['StudyDate']),
                                               '{}'.format(series_description))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
@@ -401,20 +405,19 @@ class Dicom_Reporter(object):
                     if not self.force_rewrite and os.path.exists(output_filename):
                         continue
 
-                    dicom_filenames = series_dict['dicom_filenames']
-                    reader.SetFileNames(dicom_filenames)
+                    reader.SetFileNames(self.dicom_dict[series_id]['dicom_filenames'])
                     dicom_handle = reader.Execute()
                     identity_direction = tuple(np.identity(len(dicom_handle.GetSize())).flatten())
                     dicom_handle.SetDirection(identity_direction)
                     sitk.WriteImage(dicom_handle, output_filename)
 
-                    if series_dict.get('RTDOSE'):
-                        self.rtdose_writer(output_dir=output_dir, rtdose_series=series_dict['RTDOSE'],
+                    if self.dicom_dict[series_id].get('RTDOSE'):
+                        self.rtdose_writer(output_dir=output_dir, rtdose_series=self.dicom_dict[series_id]['RTDOSE'],
                                            dicom_handle=dicom_handle)
 
-                    if series_dict.get('RTSTRUCT'):
+                    if self.dicom_dict[series_id].get('RTSTRUCT'):
                         self.rtstruct_writer(output_dir=output_dir, dicom_handle=dicom_handle,
-                                             rtstruct_series=series_dict['RTSTRUCT'])
+                                             rtstruct_series=self.dicom_dict[series_id]['RTSTRUCT'])
 
                 except:
                     print('Failed on {} {}'.format(series_id, output_path))
@@ -431,7 +434,9 @@ class Dicom_Reporter(object):
             t.start()
             threads.append(t)
 
-        for series_id in tqdm(self.dicom_dict.keys(), desc='Converting DICOM to NIfTI'):
+        if self.verbose:
+            print("Converting DICOM:")
+        for series_id in list(self.dicom_dict.keys()):
             output_path = os.path.join(self.output_dir, self.dicom_dict[series_id]['PatientID'].rstrip())
 
             if not os.path.exists(output_path):
@@ -439,8 +444,10 @@ class Dicom_Reporter(object):
 
             item = [series_id, output_path]
             q.put(item)
+            break
 
         for worker in range(self.nb_threads):
             q.put(None)
         for t in threads:
             t.join()
+
