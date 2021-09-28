@@ -4,17 +4,12 @@ from Dicom_Reporter_Class import Dicom_Reporter
 def main():
     input_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_explore_example'
     output_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_explore_example\nifti'
-
-    supp_tags = {
-    }
-
+    supp_tags = {}
     contour_names = []
     contour_association = {}
-
     rt_template = {'image_series_id': False,
                    'study_desc_name': True,
                    'merge_study_serie_desc': True}
-    
     mg_template = {'image_series_id': True,
                    'study_desc_name': False,
                    'merge_study_serie_desc': False}
