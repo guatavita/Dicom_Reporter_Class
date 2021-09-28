@@ -221,7 +221,7 @@ class Dicom_Reporter(object):
 
         if self.verbose:
             time_start = time.time()
-            print("Reading dicom:")
+            print("Reading DICOM:")
         for dicom_folder in self.folders_with_dcm:
             item = dicom_folder
             q.put(item)
@@ -280,9 +280,6 @@ class Dicom_Reporter(object):
                 series_dict[tag_name] = reader.GetMetaData(slice_id, tag_key)
             else:
                 series_dict[tag_name] = None
-                if self.verbose:
-                    print('DCM tag {} ({}) not found for {}'.format(tag_name, tag_key,
-                                                                    dicom_filenames[0].split('//')[:-3]))
 
         out_dict[series_id] = series_dict
 
