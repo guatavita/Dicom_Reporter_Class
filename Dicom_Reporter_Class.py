@@ -48,8 +48,8 @@ def splitext_(path):
 
 class Dicom_Reporter(object):
     def __init__(self, input_dir, output_dir=None, contour_names=[], contour_association={}, force_rewrite=False,
-                 image_series_id=False, study_desc_name=True, save_json=True, load_json=True, supp_tags={},
-                 nb_threads=int(0.5 * cpu_count()), verbose=False):
+                 image_series_id=False, study_desc_name=True, merge_study_serie_desc=True, save_json=True,
+                 load_json=True, supp_tags={}, nb_threads=int(0.5 * cpu_count()), verbose=False):
         '''
         :param input_dir: input folder where (unorganized) dicom can be found
         :param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\StudyDate\StudyORSeriesDescription
@@ -58,6 +58,7 @@ class Dicom_Reporter(object):
         :param force_rewrite: for rewrite of NIfTI images (user should remove dcm_report.json)
         :param image_series_id: True if you want the series id in the image filename, if you expect multiple series in study output dir
         :param study_desc_folder_name: True if you want the output folder to be named after the StudyDescription (False -> SeriesDescription)
+        :param merge_study_serie_desc: merge study and series descript for image folder name
         :param save_json: save dcm_report.json in output_dir
         :param load_json: reload previous dcm_report.json
         :param supp_tags: extract DICOM metadata for in-house usage
@@ -80,6 +81,7 @@ class Dicom_Reporter(object):
         self.nb_threads = min(nb_threads, int(0.9 * cpu_count()))
         self.image_series_id = image_series_id
         self.study_desc_name = study_desc_name
+        self.merge_study_serie_desc = merge_study_serie_desc
         self.save_json = save_json
         self.load_json = load_json
         self.dcm_report_path = os.path.join(self.output_dir, 'dcm_report.json')
@@ -396,25 +398,25 @@ class Dicom_Reporter(object):
                     if self.contour_association.get(roi_name):
                         roi_name = self.contour_association.get(roi_name)
 
-                    mask = np.zeros(ref_size[::-1], dtype=np.int8)
-                    for contour_sequence in roi_contour.ContourSequence:
-                        pts_list = [contour_sequence.ContourData[i:i + 3] for i in
-                                    range(0, len(contour_sequence.ContourData), 3)]
-                        pts_array = (np.array(pts_list) - ref_origin) / ref_spacing
-                        slice_mask = cv2.fillPoly(np.zeros(ref_size[:2]), pts=[pts_array[:, :2].astype(np.int32)],
-                                                  color=(255, 255, 255))
-                        slice_id = int(pts_array[0, 2])
-                        if np.any(mask[slice_id, :, :][slice_mask > 0]) == 1:
-                            mask[slice_id, :, :][slice_mask > 0] = 0
-                        else:
-                            mask[slice_id, :, :][slice_mask > 0] = 1
-
-                    mask_handle = sitk.GetImageFromArray(mask)
-                    mask_handle.SetDirection(dicom_handle.GetDirection())
-                    mask_handle.SetOrigin(ref_origin)
-                    mask_handle.SetSpacing(ref_spacing)
                     output_filename = os.path.join(output_dir, '{}.nii.gz'.format(sanitize_filepath(roi_name)))
                     if self.force_rewrite or not os.path.exists(output_filename):
+                        mask = np.zeros(ref_size[::-1], dtype=np.int8)
+                        for contour_sequence in roi_contour.ContourSequence:
+                            pts_list = [contour_sequence.ContourData[i:i + 3] for i in
+                                        range(0, len(contour_sequence.ContourData), 3)]
+                            pts_array = (np.array(pts_list) - ref_origin) / ref_spacing
+                            slice_mask = cv2.fillPoly(np.zeros(ref_size[:2]), pts=[pts_array[:, :2].astype(np.int32)],
+                                                      color=(255, 255, 255))
+                            slice_id = int(pts_array[0, 2])
+                            if np.any(mask[slice_id, :, :][slice_mask > 0]) == 1:
+                                mask[slice_id, :, :][slice_mask > 0] = 0
+                            else:
+                                mask[slice_id, :, :][slice_mask > 0] = 1
+
+                        mask_handle = sitk.GetImageFromArray(mask)
+                        mask_handle.SetDirection(dicom_handle.GetDirection())
+                        mask_handle.SetOrigin(ref_origin)
+                        mask_handle.SetSpacing(ref_spacing)
                         sitk.WriteImage(mask_handle, output_filename)
             except:
                 print('Failed to match rtstruct {}'.format(rtstruct_series_id))
@@ -431,10 +433,15 @@ class Dicom_Reporter(object):
                 reader.MetaDataDictionaryArrayUpdateOff()
                 reader.LoadPrivateTagsOff()
                 try:
-                    if self.study_desc_name:
-                        description = self.dicom_dict[series_id]['StudyDescription'].rstrip().replace(' ', '_')
+                    if self.merge_study_serie_desc:
+                        description = "{}_{}".format(
+                            self.dicom_dict[series_id]['StudyDescription'].rstrip().replace(' ', '_'),
+                            self.dicom_dict[series_id]['SeriesDescription'].rstrip().replace(' ', '_'))
                     else:
-                        description = self.dicom_dict[series_id]['SeriesDescription'].rstrip().replace(' ', '_')
+                        if self.study_desc_name:
+                            description = self.dicom_dict[series_id]['StudyDescription'].rstrip().replace(' ', '_')
+                        else:
+                            description = self.dicom_dict[series_id]['SeriesDescription'].rstrip().replace(' ', '_')
 
                     description = ''.join(e for e in description if e.isalnum() or e == '_')
                     if self.dicom_dict[series_id]['PresentationIntentType']:
@@ -450,13 +457,14 @@ class Dicom_Reporter(object):
                     else:
                         output_filename = os.path.join(output_dir, 'image.nii.gz')
 
-                    reader.SetFileNames(self.dicom_dict[series_id]['dicom_filenames'])
-                    dicom_handle = reader.Execute()
-                    identity_direction = tuple(np.identity(len(dicom_handle.GetSize())).flatten())
-                    dicom_handle.SetDirection(identity_direction)
-
                     if self.force_rewrite or not os.path.exists(output_filename):
+                        reader.SetFileNames(self.dicom_dict[series_id]['dicom_filenames'])
+                        dicom_handle = reader.Execute()
+                        identity_direction = tuple(np.identity(len(dicom_handle.GetSize())).flatten())
+                        dicom_handle.SetDirection(identity_direction)
                         sitk.WriteImage(dicom_handle, output_filename)
+                    else:
+                        dicom_handle = sitk.ReadImage(output_filename)
 
                     if self.dicom_dict[series_id].get('RTDOSE'):
                         self.rtdose_writer(output_dir=output_dir, rtdose_series=self.dicom_dict[series_id]['RTDOSE'],

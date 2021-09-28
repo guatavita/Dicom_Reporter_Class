@@ -16,11 +16,13 @@ def main():
                                     contour_names=contour_names,
                                     contour_association=contour_association,
                                     force_rewrite=True,
-                                    image_series_id=False, study_desc_name=True,
+                                    image_series_id=False,
+                                    study_desc_name=True,
+                                    merge_study_serie_desc=True,
                                     save_json=True,
                                     load_json=True,
                                     supp_tags=supp_tags,
-                                    nb_threads=1, verbose=True)
+                                    nb_threads=24, verbose=True)
     dicom_explorer.run_conversion()
 
 
