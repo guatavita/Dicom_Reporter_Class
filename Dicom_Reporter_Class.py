@@ -1,4 +1,5 @@
 import os, glob
+import time
 import json
 from threading import Thread
 from multiprocessing import cpu_count
@@ -76,7 +77,7 @@ class Dicom_Reporter(object):
         self.contour_association = contour_association
         self.force_rewrite = force_rewrite
         self.set_tags(supp_tags)
-        self.nb_threads = min(nb_threads, cpu_count())
+        self.nb_threads = min(nb_threads, int(0.9 * cpu_count()))
         self.save_json = save_json
         self.load_json = load_json
         self.dcm_report_path = os.path.join(self.output_dir, 'dcm_report.json')
@@ -105,6 +106,7 @@ class Dicom_Reporter(object):
     def create_association(self):
 
         if self.verbose:
+            time_start = time.time()
             print("Merging RTDOSE:")
         # merging rdstruct to the corresponding study instance uid of the images
         for rd_series_key in list(self.rd_dict.keys()):
@@ -137,6 +139,8 @@ class Dicom_Reporter(object):
                         self.dicom_dict[dcm_series_key]['RTSTRUCT'] = []
                     if rt_series_key not in self.dicom_dict[dcm_series_key]['RTSTRUCT']:
                         self.dicom_dict[dcm_series_key]['RTSTRUCT'].append(rt_series_key)
+        if self.verbose:
+            print("     Elapsed time {}".format(time.time() - time_start))
 
     def force_update(self):
         self.walk_main_directory()
@@ -167,6 +171,7 @@ class Dicom_Reporter(object):
 
     def walk_main_directory(self):
         if self.verbose:
+            time_start = time.time()
             print("Looking for DICOM:")
         for root, dirs, files in os.walk(self.input_dir, topdown=False):
             if glob.glob(os.path.join(root, '*.dcm')):
@@ -174,6 +179,7 @@ class Dicom_Reporter(object):
 
         if self.verbose:
             print("A total of {} folders with DICOM files was found".format(len(self.folders_with_dcm)))
+            print("     Elapsed time {}".format(time.time() - time_start))
 
     def dicom_reader_worker(self, q):
         while True:
@@ -214,6 +220,7 @@ class Dicom_Reporter(object):
             threads.append(t)
 
         if self.verbose:
+            time_start = time.time()
             print("Reading dicom:")
         for dicom_folder in self.folders_with_dcm:
             item = dicom_folder
@@ -223,6 +230,9 @@ class Dicom_Reporter(object):
             q.put(None)
         for t in threads:
             t.join()
+
+        if self.verbose:
+            print("     Elapsed time {}".format(time.time() - time_start))
 
     def rtstruct_reader(self, rtstruct_files=[]):
         for rtstruct_file in rtstruct_files:
@@ -256,7 +266,7 @@ class Dicom_Reporter(object):
         else:
             modality = 'Unknown'
 
-        # these are pointer they link to the dict content in memory
+        # these are pointers they link to the dict content in memory
         if modality.lower() == 'rtdose':
             out_dict = self.rd_dict
         else:
@@ -435,6 +445,7 @@ class Dicom_Reporter(object):
             threads.append(t)
 
         if self.verbose:
+            time_start = time.time()
             print("Converting DICOM:")
         for series_id in list(self.dicom_dict.keys()):
             output_path = os.path.join(self.output_dir, self.dicom_dict[series_id]['PatientID'].rstrip())
@@ -444,10 +455,11 @@ class Dicom_Reporter(object):
 
             item = [series_id, output_path]
             q.put(item)
-            break
 
         for worker in range(self.nb_threads):
             q.put(None)
         for t in threads:
             t.join()
 
+        if self.verbose:
+            print("     Elapsed time {}".format(time.time() - time_start))

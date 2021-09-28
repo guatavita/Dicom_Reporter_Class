@@ -1,5 +1,5 @@
-import time
-from Dicom_Reporter_Class import *
+from Dicom_Reporter_Class import Dicom_Reporter
+
 
 def main():
     input_dir = r'Z:\Morfeus\Bastien\DICOM\EBRT_database_phase_2'
@@ -8,10 +8,10 @@ def main():
     supp_tags = {
     }
 
-    contour_names = ['Bladder']
+    contour_names = ['Cervix-Uterus', 'Bladder', 'Rectum', 'Sigmoid', 'Vagina', 'Parametrium', 'Femur_R', 'Femur_L',
+                     'Kidney_R', 'Kidney_L', 'Spinal', 'Bowel']
     contour_association = {
     }
-    time_start = time.time()
     dicom_explorer = Dicom_Reporter(input_dir=input_dir,
                                     output_dir=output_dir,
                                     contour_names=contour_names,
@@ -20,9 +20,8 @@ def main():
                                     save_json=True,
                                     load_json=True,
                                     supp_tags=supp_tags,
-                                    nb_threads=32, verbose=True)
+                                    nb_threads=24, verbose=True)
     dicom_explorer.run_conversion()
-    print("     Elapse time {}".format(time.time() - time_start))
 
 
 if __name__ == '__main__':
