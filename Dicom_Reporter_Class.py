@@ -321,13 +321,6 @@ class Dicom_Reporter(object):
         :return: dictionary or list of the series ID per dicom
         '''
         series_ids_list = reader.GetGDCMSeriesIDs(input_folder)
-
-        if self.verbose:
-            if len(series_ids_list) > 1:
-                print("Warning: More than one series ids were found")
-            elif len(series_ids_list) == 0:
-                print("Warning: NO series ids were found")
-
         if get_filenames:
             series_dict = {}
             for series_id in series_ids_list:
