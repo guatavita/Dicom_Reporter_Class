@@ -48,13 +48,16 @@ def splitext_(path):
 
 class Dicom_Reporter(object):
     def __init__(self, input_dir, output_dir=None, contour_names=[], contour_association={}, force_rewrite=False,
-                 save_json=True, load_json=True, supp_tags={}, nb_threads=int(0.5 * cpu_count()), verbose=False):
+                 image_series_id=False, study_desc_name=True, save_json=True, load_json=True, supp_tags={},
+                 nb_threads=int(0.5 * cpu_count()), verbose=False):
         '''
         :param input_dir: input folder where (unorganized) dicom can be found
-        :param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\StudyDate\SeriesDescription
+        :param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\StudyDate\StudyORSeriesDescription
         :param contour_names: list of contour names that will be written, ALL if empty
         :param contour_association: dictionary of contour names association
         :param force_rewrite: for rewrite of NIfTI images (user should remove dcm_report.json)
+        :param image_series_id: True if you want the series id in the image filename, if you expect multiple series in study output dir
+        :param study_desc_folder_name: True if you want the output folder to be named after the StudyDescription (False -> SeriesDescription)
         :param save_json: save dcm_report.json in output_dir
         :param load_json: reload previous dcm_report.json
         :param supp_tags: extract DICOM metadata for in-house usage
@@ -75,6 +78,8 @@ class Dicom_Reporter(object):
         self.force_rewrite = force_rewrite
         self.set_tags(supp_tags)
         self.nb_threads = min(nb_threads, int(0.9 * cpu_count()))
+        self.image_series_id = image_series_id
+        self.study_desc_name = study_desc_name
         self.save_json = save_json
         self.load_json = load_json
         self.dcm_report_path = os.path.join(self.output_dir, 'dcm_report.json')
@@ -104,7 +109,7 @@ class Dicom_Reporter(object):
 
         if self.verbose:
             time_start = time.time()
-            print("Merging RTDOSE:")
+            print("\nMerging RTDOSE:")
         # merging rdstruct to the corresponding study instance uid of the images
         for rd_series_key in list(self.rd_dict.keys()):
             rd_study_instance_uid = self.rd_dict[rd_series_key]['StudyInstanceUID']
@@ -121,7 +126,7 @@ class Dicom_Reporter(object):
                         self.dicom_dict[dcm_series_key]['RTDOSE'].append(rd_series_key)
 
         if self.verbose:
-            print("Merging RTSTRUCT:")
+            print("\nMerging RTSTRUCT:")
         # merging rtstruct to the corresponding study instance uid of the images
         for rt_series_key in list(self.rt_dict.keys()):
             rt_study_instance_uid = self.rt_dict[rt_series_key]['StudyInstanceUID']
@@ -137,7 +142,7 @@ class Dicom_Reporter(object):
                     if rt_series_key not in self.dicom_dict[dcm_series_key]['RTSTRUCT']:
                         self.dicom_dict[dcm_series_key]['RTSTRUCT'].append(rt_series_key)
         if self.verbose:
-            print("     Elapsed time {}".format(time.time() - time_start))
+            print("Elapsed time {}s".format(int(time.time() - time_start)))
 
     def force_update(self):
         self.walk_main_directory()
@@ -169,14 +174,14 @@ class Dicom_Reporter(object):
     def walk_main_directory(self):
         if self.verbose:
             time_start = time.time()
-            print("Looking for DICOM:")
+            print("\nLooking for DICOM:")
         for root, dirs, files in os.walk(self.input_dir, topdown=False):
             if glob.glob(os.path.join(root, '*.dcm')):
                 self.folders_with_dcm.append(root)
 
         if self.verbose:
             print("A total of {} folders with DICOM files was found".format(len(self.folders_with_dcm)))
-            print("     Elapsed time {}".format(time.time() - time_start))
+            print("Elapsed time {}s".format(int(time.time() - time_start)))
 
     def dicom_reader_worker(self, q):
         while True:
@@ -224,7 +229,7 @@ class Dicom_Reporter(object):
 
         if self.verbose:
             time_start = time.time()
-            print("Reading DICOM:")
+            print("\nReading DICOM:")
         for dicom_folder in self.folders_with_dcm:
             item = dicom_folder
             q.put(item)
@@ -235,14 +240,31 @@ class Dicom_Reporter(object):
             t.join()
 
         if self.verbose:
-            print("     Elapsed time {}".format(time.time() - time_start))
+            print("Elapsed time {}s".format(int(time.time() - time_start)))
+            if self.dicom_dict:
+                nb_dicom = 0
+                for series_id in list(self.dicom_dict.keys()):
+                    nb_dicom += len(self.dicom_dict[series_id]['dicom_filenames'])
+                print("Nb DICOM files to process: {}".format(nb_dicom))
+
+            if self.rd_dict:
+                nb_rtdose = 0
+                for series_id in list(self.rd_dict.keys()):
+                    nb_rtdose += len(self.rd_dict[series_id]['dicom_filenames'])
+                print("Nb RTDOSE files to process: {}".format(nb_rtdose))
+
+            if self.rt_dict:
+                nb_rtstruct = 0
+                for series_id in list(self.rt_dict.keys()):
+                    nb_rtstruct += len(self.rt_dict[series_id]['dicom_filenames'])
+                print("Nb RTSTRUCT files to process: {}".format(nb_rtstruct))
 
     def rtstruct_reader(self, rtstruct_files=[]):
         for rtstruct_file in rtstruct_files:
             try:
                 ds = pydicom.read_file(rtstruct_file)
             except:
-                print("\n         Dicom cannot be read\n")
+                print("Dicom cannot be read {}".format(rtstruct_file))
                 return
 
             series_id = ds.get('SeriesInstanceUID')
@@ -251,7 +273,7 @@ class Dicom_Reporter(object):
                 continue
 
             series_dict = {}
-            series_dict['dicom_filenames'] = rtstruct_file
+            series_dict['dicom_filenames'] = [rtstruct_file]
             for tag_name in list(self.tags_dict.keys()):
                 tag_key = self.tags_dict.get(tag_name)
                 if not tag_key:
@@ -261,6 +283,12 @@ class Dicom_Reporter(object):
             self.rt_dict[series_id] = series_dict
 
     def dictionary_creator(self, series_id, dicom_filenames, reader):
+        '''
+        :param series_id:
+        :param dicom_filenames: list
+        :param reader: sitk.ImageFileReader()
+        :return:
+        '''
         series_dict = {}
         series_dict['dicom_filenames'] = dicom_filenames
         if reader.HasMetaDataKey('0008|0060'):
@@ -288,7 +316,7 @@ class Dicom_Reporter(object):
     def series_reader(self, reader, input_folder, get_filenames=False):
         '''
         :param input_folder:
-        :return: dictionarry of the series ID per dicom
+        :return: dictionary or list of the series ID per dicom
         '''
         series_ids_list = reader.GetGDCMSeriesIDs(input_folder)
 
@@ -335,18 +363,20 @@ class Dicom_Reporter(object):
                     dose_handle.SetSpacing(spacing[:3])
                     if dicom_handle:
                         dose_handle = sitk.Resample(dose_handle, dicom_handle)
-                    sitk.WriteImage(dose_handle,
-                                    os.path.join(output_dir, 'dose_{}_{}_{}.nii.gz'.format(i, self.rd_dict[
-                                        rtdose_series_id]['DoseSummationType'], c)))
+                    output_filename = os.path.join(output_dir, 'dose_{}_{}_{}.nii.gz'.format(i, self.rd_dict[
+                        rtdose_series_id]['DoseSummationType'], c))
+                    if self.force_rewrite or not os.path.exists(output_filename):
+                        sitk.WriteImage(dose_handle, output_filename)
             else:
                 dose_handle = sitk.GetImageFromArray(dose_array)
                 dose_handle.SetOrigin(origin[:3])
                 dose_handle.SetSpacing(spacing[:3])
                 if dicom_handle:
                     dose_handle = sitk.Resample(dose_handle, dicom_handle)
-                sitk.WriteImage(dose_handle,
-                                os.path.join(output_dir, 'dose_{}_{}.nii.gz'.format(i, self.rd_dict[
-                                    rtdose_series_id]['DoseSummationType'])))
+                output_filename = os.path.join(output_dir, 'dose_{}_{}.nii.gz'.format(i, self.rd_dict[
+                    rtdose_series_id]['DoseSummationType']))
+                if self.force_rewrite or not os.path.exists(output_filename):
+                    sitk.WriteImage(dose_handle, output_filename)
             i += 1
 
     def rtstruct_writer(self, output_dir, dicom_handle, rtstruct_series=[]):
@@ -383,10 +413,11 @@ class Dicom_Reporter(object):
                     mask_handle.SetDirection(dicom_handle.GetDirection())
                     mask_handle.SetOrigin(ref_origin)
                     mask_handle.SetSpacing(ref_spacing)
-                    sitk.WriteImage(mask_handle,
-                                    os.path.join(output_dir, '{}.nii.gz'.format(sanitize_filepath(roi_name))))
+                    output_filename = os.path.join(output_dir, '{}.nii.gz'.format(sanitize_filepath(roi_name)))
+                    if self.force_rewrite or not os.path.exists(output_filename):
+                        sitk.WriteImage(mask_handle, output_filename)
             except:
-                print('failed to match rtstruct {}'.format(rtstruct_series_id))
+                print('Failed to match rtstruct {}'.format(rtstruct_series_id))
 
     def dicom_writer_worker(self, q):
         while True:
@@ -400,25 +431,32 @@ class Dicom_Reporter(object):
                 reader.MetaDataDictionaryArrayUpdateOff()
                 reader.LoadPrivateTagsOff()
                 try:
-                    series_description = self.dicom_dict[series_id]['SeriesDescription'].rstrip().replace(' ', '_')
-                    series_description = ''.join(e for e in series_description if e.isalnum() or e == '_')
+                    if self.study_desc_name:
+                        description = self.dicom_dict[series_id]['StudyDescription'].rstrip().replace(' ', '_')
+                    else:
+                        description = self.dicom_dict[series_id]['SeriesDescription'].rstrip().replace(' ', '_')
+
+                    description = ''.join(e for e in description if e.isalnum() or e == '_')
                     if self.dicom_dict[series_id]['PresentationIntentType']:
-                        series_description += '_{}'.format(
+                        description += '_{}'.format(
                             self.dicom_dict[series_id]['PresentationIntentType'].replace(' ', '_'))
                     output_dir = os.path.join(output_path,
                                               '{}'.format(self.dicom_dict[series_id]['StudyDate']),
-                                              '{}'.format(series_description))
+                                              '{}'.format(description))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
-                    output_filename = os.path.join(output_dir, 'image_series_{}.nii.gz'.format(series_id))
-                    if not self.force_rewrite and os.path.exists(output_filename):
-                        continue
+                    if self.image_series_id:
+                        output_filename = os.path.join(output_dir, 'image_series_{}.nii.gz'.format(series_id))
+                    else:
+                        output_filename = os.path.join(output_dir, 'image.nii.gz')
 
                     reader.SetFileNames(self.dicom_dict[series_id]['dicom_filenames'])
                     dicom_handle = reader.Execute()
                     identity_direction = tuple(np.identity(len(dicom_handle.GetSize())).flatten())
                     dicom_handle.SetDirection(identity_direction)
-                    sitk.WriteImage(dicom_handle, output_filename)
+
+                    if self.force_rewrite or not os.path.exists(output_filename):
+                        sitk.WriteImage(dicom_handle, output_filename)
 
                     if self.dicom_dict[series_id].get('RTDOSE'):
                         self.rtdose_writer(output_dir=output_dir, rtdose_series=self.dicom_dict[series_id]['RTDOSE'],
@@ -445,7 +483,7 @@ class Dicom_Reporter(object):
 
         if self.verbose:
             time_start = time.time()
-            print("Converting DICOM:")
+            print("\nConverting DICOM:")
         for series_id in list(self.dicom_dict.keys()):
             output_path = os.path.join(self.output_dir, self.dicom_dict[series_id]['PatientID'].rstrip())
 
@@ -461,4 +499,4 @@ class Dicom_Reporter(object):
             t.join()
 
         if self.verbose:
-            print("     Elapsed time {}".format(time.time() - time_start))
+            print("Elapsed time {}s".format(int(time.time() - time_start)))
