@@ -20,7 +20,7 @@ def main():
                                     save_json=True,
                                     load_json=True,
                                     supp_tags=supp_tags,
-                                    nb_threads=24, verbose=True)
+                                    nb_threads=1, verbose=True)
     dicom_explorer.run_conversion()
 
 

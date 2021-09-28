@@ -64,9 +64,6 @@ class Dicom_Reporter(object):
 
         # TODO create dicom_report in excel sheet?
         # TODO remove series_id in output file name
-        # TODO use pydicom for the dicom_reader_worker? (could be faster without loading the pixel data)
-        # TODO evaluate memory usage
-        # TODO evaluate how the ROIsequence are in the json
 
         self.input_dir = input_dir
         self.output_dir = output_dir
@@ -188,21 +185,27 @@ class Dicom_Reporter(object):
                 break
             else:
                 dicom_folder = item
-                reader = sitk.ImageSeriesReader()
-                reader.SetGlobalWarningDisplay(False)
-                reader.MetaDataDictionaryArrayUpdateOn()
-                reader.LoadPrivateTagsOn()
+                series_reader = sitk.ImageSeriesReader()
+                series_reader.SetGlobalWarningDisplay(False)
+                series_reader.MetaDataDictionaryArrayUpdateOn()
+                series_reader.LoadPrivateTagsOn()
+
+                file_reader = sitk.ImageFileReader()
+                file_reader.SetGlobalWarningDisplay(False)
+                file_reader.SetGlobalWarningDisplay(False)
+                file_reader.LoadPrivateTagsOn()
+
                 try:
                     # this support only standard dicom and RTDOSE
-                    series_ids_list = self.series_reader(reader, dicom_folder, get_filenames=False)
+                    series_ids_list = self.series_reader(series_reader, dicom_folder, get_filenames=False)
                     for it, series_id in enumerate(series_ids_list):
                         if self.dicom_dict.get(series_id) or self.rd_dict.get(series_id):
                             # make sure we don't rerun the same patient series id if previously loaded
                             continue
-                        dicom_filenames = reader.GetGDCMSeriesFileNames(dicom_folder, series_id)
-                        reader.SetFileNames(dicom_filenames)
-                        reader.Execute()
-                        self.dictionary_creator(series_id, dicom_filenames, reader)
+                        dicom_filenames = series_reader.GetGDCMSeriesFileNames(dicom_folder, series_id)
+                        file_reader.SetFileName(dicom_filenames[0])
+                        file_reader.Execute()
+                        self.dictionary_creator(series_id, dicom_filenames, file_reader)
 
                     # this is to read RTSTRUCT
                     rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
@@ -258,11 +261,10 @@ class Dicom_Reporter(object):
             self.rt_dict[series_id] = series_dict
 
     def dictionary_creator(self, series_id, dicom_filenames, reader):
-        slice_id = 0
         series_dict = {}
         series_dict['dicom_filenames'] = dicom_filenames
-        if reader.HasMetaDataKey(slice_id, '0008|0060'):
-            modality = reader.GetMetaData(slice_id, '0008|0060')
+        if reader.HasMetaDataKey('0008|0060'):
+            modality = reader.GetMetaData('0008|0060')
         else:
             modality = 'Unknown'
 
@@ -276,8 +278,8 @@ class Dicom_Reporter(object):
             tag_key = self.tags_dict.get(tag_name)
             if not tag_key:
                 continue
-            if reader.HasMetaDataKey(slice_id, tag_key):
-                series_dict[tag_name] = reader.GetMetaData(slice_id, tag_key)
+            if reader.HasMetaDataKey(tag_key):
+                series_dict[tag_name] = reader.GetMetaData(tag_key)
             else:
                 series_dict[tag_name] = None
 
