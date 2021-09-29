@@ -24,7 +24,7 @@ def main():
                                     force_rewrite=True,
                                     save_json=True,
                                     load_json=True,
-                                    supp_tags=supp_tags, nb_threads=50, 
+                                    supp_tags=supp_tags, nb_threads=50,
                                     verbose=True, **mg_template)
     dicom_explorer.run_conversion()
 

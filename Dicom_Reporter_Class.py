@@ -46,6 +46,112 @@ def splitext_(path):
     return os.path.splitext(path)
 
 
+def dicom_reader_worker(q):
+    while True:
+        item = q.get()
+        if item is None:
+            break
+        else:
+            dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict = item
+            series_reader = sitk.ImageSeriesReader()
+            series_reader.SetGlobalWarningDisplay(False)
+            series_reader.MetaDataDictionaryArrayUpdateOn()
+            series_reader.LoadPrivateTagsOn()
+
+            file_reader = sitk.ImageFileReader()
+            file_reader.SetGlobalWarningDisplay(False)
+            file_reader.SetGlobalWarningDisplay(False)
+            file_reader.LoadPrivateTagsOn()
+
+            try:
+                # this support only standard dicom and RTDOSE
+                series_ids_list = return_series_ids(series_reader, dicom_folder, get_filenames=False)
+                for it, series_id in enumerate(series_ids_list):
+                    if series_id not in dicom_dict and series_id not in rd_dict:
+                        dicom_filenames = series_reader.GetGDCMSeriesFileNames(dicom_folder, series_id)
+                        file_reader.SetFileName(dicom_filenames[0])
+                        try:
+                            file_reader.Execute()
+                        except:
+                            print('Reader failed on {} {}'.format(dicom_folder, series_id))
+                            continue
+                        dictionary_creator(series_id, dicom_filenames, file_reader, dicom_dict, rd_dict, tags_dict)
+
+                # this is to read RTSTRUCT
+                rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
+                if rtstruct_files:
+                    rtstruct_reader(rtstruct_files, rt_dict, tags_dict)
+            except:
+                print('Failed on {}'.format(dicom_folder))
+            q.task_done()
+
+
+def return_series_ids(reader, input_folder, get_filenames=False):
+    '''
+    :param input_folder:
+    :return: dictionary or list of the series ID per dicom
+    '''
+    series_ids_list = reader.GetGDCMSeriesIDs(input_folder)
+    if get_filenames:
+        series_dict = {}
+        for series_id in series_ids_list:
+            series_dict[series_id] = reader.GetGDCMSeriesFileNames(input_folder, series_id)
+        return series_dict
+    else:
+        return series_ids_list
+
+
+def dictionary_creator(series_id, dicom_filenames, reader, dicom_dict, rd_dict, tags_dict):
+    '''
+    :param series_id:
+    :param dicom_filenames: list
+    :param reader: sitk.ImageFileReader()
+    :return:
+    '''
+    series_dict = {}
+    series_dict['dicom_filenames'] = dicom_filenames
+    if reader.HasMetaDataKey('0008|0060'):
+        modality = reader.GetMetaData('0008|0060')
+    else:
+        modality = 'Unknown'
+
+    for tag_name in list(tags_dict.keys()):
+        tag_key = tags_dict.get(tag_name)
+        if not tag_key:
+            continue
+        if reader.HasMetaDataKey(tag_key):
+            series_dict[tag_name] = reader.GetMetaData(tag_key)
+        else:
+            series_dict[tag_name] = None
+
+    if modality.lower() == 'rtdose':
+        rd_dict[series_id] = series_dict
+    else:
+        dicom_dict[series_id] = series_dict
+
+
+def rtstruct_reader(rtstruct_files, rt_dict, tags_dict):
+    for rtstruct_file in rtstruct_files:
+        try:
+            ds = pydicom.read_file(rtstruct_file)
+        except:
+            print("Dicom cannot be read {}".format(rtstruct_file))
+            return
+
+        series_id = ds.get('SeriesInstanceUID')
+
+        if series_id not in rt_dict:
+            series_dict = {}
+            series_dict['dicom_filenames'] = [rtstruct_file]
+            for tag_name in list(tags_dict.keys()):
+                tag_key = tags_dict.get(tag_name)
+                if not tag_key:
+                    continue
+                series_dict[tag_name] = ds.get(tag_name)
+
+            rt_dict[series_id] = series_dict
+
+
 class Dicom_Reporter(object):
     def __init__(self, input_dir, output_dir=None, contour_names=[], contour_association={}, force_rewrite=False,
                  image_series_id=False, study_desc_name=True, merge_study_serie_desc=True, save_json=True,
@@ -185,52 +291,11 @@ class Dicom_Reporter(object):
             print("A total of {} folders with DICOM files was found".format(len(self.folders_with_dcm)))
             print("Elapsed time {}s".format(int(time.time() - time_start)))
 
-    def dicom_reader_worker(self, q):
-        while True:
-            item = q.get()
-            if item is None:
-                break
-            else:
-                dicom_folder = item
-                series_reader = sitk.ImageSeriesReader()
-                series_reader.SetGlobalWarningDisplay(False)
-                series_reader.MetaDataDictionaryArrayUpdateOn()
-                series_reader.LoadPrivateTagsOn()
-
-                file_reader = sitk.ImageFileReader()
-                file_reader.SetGlobalWarningDisplay(False)
-                file_reader.SetGlobalWarningDisplay(False)
-                file_reader.LoadPrivateTagsOn()
-
-                try:
-                    # this support only standard dicom and RTDOSE
-                    series_ids_list = self.series_reader(series_reader, dicom_folder, get_filenames=False)
-                    for it, series_id in enumerate(series_ids_list):
-                        if self.dicom_dict.get(series_id) or self.rd_dict.get(series_id):
-                            # make sure we don't rerun the same patient series id if previously loaded
-                            continue
-                        dicom_filenames = series_reader.GetGDCMSeriesFileNames(dicom_folder, series_id)
-                        file_reader.SetFileName(dicom_filenames[0])
-                        try:
-                            file_reader.Execute()
-                        except:
-                            print('Reader failed on {} {}'.format(dicom_folder, series_id))
-                            continue
-                        self.dictionary_creator(series_id, dicom_filenames, file_reader)
-
-                    # this is to read RTSTRUCT
-                    rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
-                    if rtstruct_files:
-                        self.rtstruct_reader(rtstruct_files)
-                except:
-                    print('Failed on {}'.format(dicom_folder))
-                q.task_done()
-
     def dicom_explorer(self):
         q = Queue(maxsize=self.nb_threads)
         threads = []
         for worker in range(self.nb_threads):
-            t = Thread(target=self.dicom_reader_worker, args=(q,))
+            t = Thread(target=dicom_reader_worker, args=(q,))
             t.start()
             threads.append(t)
 
@@ -238,7 +303,7 @@ class Dicom_Reporter(object):
             time_start = time.time()
             print("\nReading DICOM:")
         for dicom_folder in self.folders_with_dcm:
-            item = dicom_folder
+            item = [dicom_folder, self.dicom_dict, self.rd_dict, self.rt_dict, self.tags_dict]
             q.put(item)
 
         for worker in range(self.nb_threads):
@@ -265,74 +330,6 @@ class Dicom_Reporter(object):
                 for series_id in list(self.rt_dict.keys()):
                     nb_rtstruct += len(self.rt_dict[series_id]['dicom_filenames'])
                 print("Nb RTSTRUCT files to process: {}".format(nb_rtstruct))
-
-    def rtstruct_reader(self, rtstruct_files=[]):
-        for rtstruct_file in rtstruct_files:
-            try:
-                ds = pydicom.read_file(rtstruct_file)
-            except:
-                print("Dicom cannot be read {}".format(rtstruct_file))
-                return
-
-            series_id = ds.get('SeriesInstanceUID')
-
-            if self.rt_dict.get(series_id):
-                continue
-
-            series_dict = {}
-            series_dict['dicom_filenames'] = [rtstruct_file]
-            for tag_name in list(self.tags_dict.keys()):
-                tag_key = self.tags_dict.get(tag_name)
-                if not tag_key:
-                    continue
-                series_dict[tag_name] = ds.get(tag_name)
-
-            self.rt_dict[series_id] = series_dict
-
-    def dictionary_creator(self, series_id, dicom_filenames, reader):
-        '''
-        :param series_id:
-        :param dicom_filenames: list
-        :param reader: sitk.ImageFileReader()
-        :return:
-        '''
-        series_dict = {}
-        series_dict['dicom_filenames'] = dicom_filenames
-        if reader.HasMetaDataKey('0008|0060'):
-            modality = reader.GetMetaData('0008|0060')
-        else:
-            modality = 'Unknown'
-
-        # these are pointers they link to the dict content in memory
-        if modality.lower() == 'rtdose':
-            out_dict = self.rd_dict
-        else:
-            out_dict = self.dicom_dict
-
-        for tag_name in list(self.tags_dict.keys()):
-            tag_key = self.tags_dict.get(tag_name)
-            if not tag_key:
-                continue
-            if reader.HasMetaDataKey(tag_key):
-                series_dict[tag_name] = reader.GetMetaData(tag_key)
-            else:
-                series_dict[tag_name] = None
-
-        out_dict[series_id] = series_dict
-
-    def series_reader(self, reader, input_folder, get_filenames=False):
-        '''
-        :param input_folder:
-        :return: dictionary or list of the series ID per dicom
-        '''
-        series_ids_list = reader.GetGDCMSeriesIDs(input_folder)
-        if get_filenames:
-            series_dict = {}
-            for series_id in series_ids_list:
-                series_dict[series_id] = reader.GetGDCMSeriesFileNames(input_folder, series_id)
-            return series_dict
-        else:
-            return series_ids_list
 
     def rtdose_writer(self, output_dir, rtdose_series=[], dicom_handle=None):
         '''
