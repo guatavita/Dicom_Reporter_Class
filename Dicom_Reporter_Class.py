@@ -134,10 +134,10 @@ def dictionary_creator(series_id, dicom_filenames, reader, dicom_dict, rd_dict, 
                 series_dict[tag_name] = None
 
     if modality.lower() == 'rtdose':
-        if series_dict not in rd_dict:
+        if series_id not in rd_dict:
             rd_dict[series_id] = series_dict
     else:
-        if series_dict not in dicom_dict:
+        if series_id not in dicom_dict:
             dicom_dict[series_id] = series_dict
 
 
