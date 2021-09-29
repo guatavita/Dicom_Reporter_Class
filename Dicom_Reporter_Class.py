@@ -51,8 +51,6 @@ class AddDicomSeriesToDict(object):
     def __init__(self):
         self.series_reader = sitk.ImageSeriesReader()
         self.series_reader.SetGlobalWarningDisplay(False)
-        self.series_reader.MetaDataDictionaryArrayUpdateOn()
-        self.series_reader.LoadPrivateTagsOn()
 
         self.file_reader = sitk.ImageFileReader()
         self.file_reader.SetGlobalWarningDisplay(False)
