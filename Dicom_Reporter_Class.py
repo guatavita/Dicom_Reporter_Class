@@ -46,6 +46,37 @@ def splitext_(path):
     return os.path.splitext(path)
 
 
+class AddDicomSeriesToDict(object):
+    def __init__(self):
+        self.series_reader = sitk.ImageSeriesReader()
+        self.series_reader.SetGlobalWarningDisplay(False)
+        self.series_reader.MetaDataDictionaryArrayUpdateOn()
+        self.series_reader.LoadPrivateTagsOn()
+
+        self.file_reader = sitk.ImageFileReader()
+        self.file_reader.SetGlobalWarningDisplay(False)
+        self.file_reader.LoadPrivateTagsOn()
+
+    def run(self, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
+        series_ids_list = self.series_reader.GetGDCMSeriesIDs(dicom_folder)
+
+        for series_id in series_ids_list:
+            if series_id not in dicom_dict and series_id not in rd_dict:
+                dicom_filenames = self.series_reader.GetGDCMSeriesFileNames(dicom_folder, series_id)
+                self.file_reader.SetFileName(dicom_filenames[0])
+                try:
+                    self.file_reader.Execute()
+                except:
+                    print('Reader failed on {} {}'.format(dicom_folder, series_id))
+                    continue
+                dictionary_creator(series_id, dicom_filenames, self.file_reader, dicom_dict, rd_dict, tags_dict)
+
+        # this is to read RTSTRUCT
+        rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
+        if rtstruct_files:
+            rtstruct_reader(rtstruct_files, rt_dict, tags_dict)
+
+
 def dicom_reader_worker(q):
     while True:
         item = q.get()
@@ -53,35 +84,10 @@ def dicom_reader_worker(q):
             break
         else:
             it, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict = item
-            series_reader = sitk.ImageSeriesReader()
-            series_reader.SetGlobalWarningDisplay(False)
-            series_reader.MetaDataDictionaryArrayUpdateOn()
-            series_reader.LoadPrivateTagsOn()
-
-            file_reader = sitk.ImageFileReader()
-            file_reader.SetGlobalWarningDisplay(False)
-            file_reader.LoadPrivateTagsOn()
-
+            dicom_series_to_dict = AddDicomSeriesToDict()
             print("{}: {}".format(it, dicom_folder))
-
             try:
-                # this support only standard dicom and RTDOSE
-                series_ids_list = return_series_ids(series_reader, dicom_folder, get_filenames=False)
-                for series_id in series_ids_list:
-                    if series_id not in dicom_dict and series_id not in rd_dict:
-                        dicom_filenames = series_reader.GetGDCMSeriesFileNames(dicom_folder, series_id)
-                        file_reader.SetFileName(dicom_filenames[0])
-                        try:
-                            file_reader.Execute()
-                        except:
-                            print('Reader failed on {} {}'.format(dicom_folder, series_id))
-                            continue
-                        dictionary_creator(series_id, dicom_filenames, file_reader, dicom_dict, rd_dict, tags_dict)
-
-                # this is to read RTSTRUCT
-                rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
-                if rtstruct_files:
-                    rtstruct_reader(rtstruct_files, rt_dict, tags_dict)
+                dicom_series_to_dict.run()
             except:
                 print('Failed on {}'.format(dicom_folder))
             q.task_done()
