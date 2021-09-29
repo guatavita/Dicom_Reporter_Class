@@ -83,9 +83,10 @@ def dicom_reader_worker(q):
         if item is None:
             break
         else:
-            it, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict = item
+            it, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, verbose = item
             dicom_series_to_dict = AddDicomSeriesToDict()
-            print("{}: {}".format(it, dicom_folder))
+            if verbose:
+                print("{}: {}".format(it, dicom_folder))
             try:
                 dicom_series_to_dict.run()
             except:
@@ -310,7 +311,7 @@ class Dicom_Reporter(object):
             time_start = time.time()
             print("\nReading DICOM:")
         for it, dicom_folder in enumerate(self.folders_with_dcm):
-            item = [it, dicom_folder, self.dicom_dict, self.rd_dict, self.rt_dict, self.tags_dict]
+            item = [it, dicom_folder, self.dicom_dict, self.rd_dict, self.rt_dict, self.tags_dict, self.verbose]
             q.put(item)
 
         for worker in range(self.nb_threads):
