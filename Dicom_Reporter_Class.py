@@ -77,7 +77,8 @@ class AddDicomSeriesToDict(object):
             rtstruct_reader(rtstruct_files, rt_dict, tags_dict)
 
 
-def dicom_reader_worker(q):
+def dicom_reader_worker(A):
+    q = A[0]
     while True:
         item = q.get()
         if item is None:
@@ -301,9 +302,10 @@ class Dicom_Reporter(object):
 
     def dicom_explorer(self):
         q = Queue(maxsize=self.nb_threads)
+        A = (q,)
         threads = []
         for worker in range(self.nb_threads):
-            t = Thread(target=dicom_reader_worker, args=(q,))
+            t = Thread(target=dicom_reader_worker, args=(A,))
             t.start()
             threads.append(t)
 
@@ -424,7 +426,8 @@ class Dicom_Reporter(object):
             except:
                 print('Failed to match rtstruct {}'.format(rtstruct_series_id))
 
-    def dicom_writer_worker(self, q):
+    def dicom_writer_worker(self, A):
+        q = A[0]
         while True:
             item = q.get()
             if item is None:
@@ -486,9 +489,10 @@ class Dicom_Reporter(object):
             raise ValueError("Output direction needs to be define (arg output_dir)")
 
         q = Queue(maxsize=self.nb_threads)
+        A = (q,)
         threads = []
         for worker in range(self.nb_threads):
-            t = Thread(target=self.dicom_writer_worker, args=(q,))
+            t = Thread(target=self.dicom_writer_worker, args=(A,))
             t.start()
             threads.append(t)
 
