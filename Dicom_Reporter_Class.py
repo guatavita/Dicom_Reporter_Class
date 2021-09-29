@@ -83,20 +83,19 @@ class AddDicomSeriesToDict(object):
 def dicom_reader_worker(A):
     q = A[0]
     while True:
-        with lock:
-            item = q.get()
-            if item is None:
-                break
-            else:
-                it, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, verbose = item
-                dicom_series_to_dict = AddDicomSeriesToDict()
-                if verbose:
-                    print("{}: {}".format(it, dicom_folder))
-                try:
-                    dicom_series_to_dict.run(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
-                except:
-                    print('Failed on {}'.format(dicom_folder))
-            q.task_done()
+        item = q.get()
+        if item is None:
+            break
+        else:
+            it, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, verbose = item
+            dicom_series_to_dict = AddDicomSeriesToDict()
+            if verbose:
+                print("{}: {}".format(it, dicom_folder))
+            try:
+                dicom_series_to_dict.run(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
+            except:
+                print('Failed on {}'.format(dicom_folder))
+        q.task_done()
 
 
 def return_series_ids(reader, input_folder, get_filenames=False):
@@ -137,10 +136,11 @@ def dictionary_creator(series_id, dicom_filenames, reader, dicom_dict, rd_dict, 
         else:
             series_dict[tag_name] = None
 
-    if modality.lower() == 'rtdose':
-        rd_dict[series_id] = series_dict
-    else:
-        dicom_dict[series_id] = series_dict
+    with lock:
+        if modality.lower() == 'rtdose':
+            rd_dict[series_id] = series_dict
+        else:
+            dicom_dict[series_id] = series_dict
 
 
 def rtstruct_reader(rtstruct_files, rt_dict, tags_dict):
@@ -161,8 +161,8 @@ def rtstruct_reader(rtstruct_files, rt_dict, tags_dict):
                 if not tag_key:
                     continue
                 series_dict[tag_name] = ds.get(tag_name)
-
-            rt_dict[series_id] = series_dict
+            with lock:
+                rt_dict[series_id] = series_dict
 
 
 class Dicom_Reporter(object):
