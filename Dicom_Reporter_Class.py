@@ -88,7 +88,7 @@ def dicom_reader_worker(q):
             if verbose:
                 print("{}: {}".format(it, dicom_folder))
             try:
-                dicom_series_to_dict.run()
+                dicom_series_to_dict.run(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
             except:
                 print('Failed on {}'.format(dicom_folder))
             q.task_done()
