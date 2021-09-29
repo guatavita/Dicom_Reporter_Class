@@ -1,4 +1,5 @@
 import os, glob
+import threading
 import time
 import json
 from threading import Thread
@@ -10,6 +11,8 @@ import SimpleITK as sitk
 import gdcm
 import pydicom
 import cv2
+
+lock = threading.Lock()
 
 tags = {
     'SOPClassUID': '0008|0016',
@@ -80,18 +83,19 @@ class AddDicomSeriesToDict(object):
 def dicom_reader_worker(A):
     q = A[0]
     while True:
-        item = q.get()
-        if item is None:
-            break
-        else:
-            it, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, verbose = item
-            dicom_series_to_dict = AddDicomSeriesToDict()
-            if verbose:
-                print("{}: {}".format(it, dicom_folder))
-            try:
-                dicom_series_to_dict.run(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
-            except:
-                print('Failed on {}'.format(dicom_folder))
+        with lock:
+            item = q.get()
+            if item is None:
+                break
+            else:
+                it, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, verbose = item
+                dicom_series_to_dict = AddDicomSeriesToDict()
+                if verbose:
+                    print("{}: {}".format(it, dicom_folder))
+                try:
+                    dicom_series_to_dict.run(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
+                except:
+                    print('Failed on {}'.format(dicom_folder))
             q.task_done()
 
 
