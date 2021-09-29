@@ -12,8 +12,6 @@ import gdcm
 import pydicom
 import cv2
 
-lock = threading.Lock()
-
 tags = {
     'SOPClassUID': '0008|0016',
     'StudyInstanceUID': '0020|000d',
@@ -129,17 +127,17 @@ def dictionary_creator(series_id, dicom_filenames, reader, dicom_dict, rd_dict, 
 
     for tag_name in list(tags_dict.keys()):
         tag_key = tags_dict.get(tag_name)
-        if not tag_key:
-            continue
-        if reader.HasMetaDataKey(tag_key):
-            series_dict[tag_name] = reader.GetMetaData(tag_key)
-        else:
-            series_dict[tag_name] = None
+        if tag_key:
+            if reader.HasMetaDataKey(tag_key):
+                series_dict[tag_name] = reader.GetMetaData(tag_key)
+            else:
+                series_dict[tag_name] = None
 
-    with lock:
-        if modality.lower() == 'rtdose':
+    if modality.lower() == 'rtdose':
+        if series_dict not in rd_dict:
             rd_dict[series_id] = series_dict
-        else:
+    else:
+        if series_dict not in dicom_dict:
             dicom_dict[series_id] = series_dict
 
 
@@ -161,8 +159,8 @@ def rtstruct_reader(rtstruct_files, rt_dict, tags_dict):
                 if not tag_key:
                     continue
                 series_dict[tag_name] = ds.get(tag_name)
-            with lock:
-                rt_dict[series_id] = series_dict
+
+            rt_dict[series_id] = series_dict
 
 
 class Dicom_Reporter(object):
