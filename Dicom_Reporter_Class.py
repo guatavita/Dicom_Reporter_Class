@@ -52,7 +52,7 @@ def dicom_reader_worker(q):
         if item is None:
             break
         else:
-            dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict = item
+            it, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict = item
             series_reader = sitk.ImageSeriesReader()
             series_reader.SetGlobalWarningDisplay(False)
             series_reader.MetaDataDictionaryArrayUpdateOn()
@@ -60,13 +60,14 @@ def dicom_reader_worker(q):
 
             file_reader = sitk.ImageFileReader()
             file_reader.SetGlobalWarningDisplay(False)
-            file_reader.SetGlobalWarningDisplay(False)
             file_reader.LoadPrivateTagsOn()
+
+            print("{}: {}".format(it, dicom_folder))
 
             try:
                 # this support only standard dicom and RTDOSE
                 series_ids_list = return_series_ids(series_reader, dicom_folder, get_filenames=False)
-                for it, series_id in enumerate(series_ids_list):
+                for series_id in series_ids_list:
                     if series_id not in dicom_dict and series_id not in rd_dict:
                         dicom_filenames = series_reader.GetGDCMSeriesFileNames(dicom_folder, series_id)
                         file_reader.SetFileName(dicom_filenames[0])
@@ -302,8 +303,8 @@ class Dicom_Reporter(object):
         if self.verbose:
             time_start = time.time()
             print("\nReading DICOM:")
-        for dicom_folder in self.folders_with_dcm:
-            item = [dicom_folder, self.dicom_dict, self.rd_dict, self.rt_dict, self.tags_dict]
+        for it, dicom_folder in enumerate(self.folders_with_dcm):
+            item = [it, dicom_folder, self.dicom_dict, self.rd_dict, self.rt_dict, self.tags_dict]
             q.put(item)
 
         for worker in range(self.nb_threads):
