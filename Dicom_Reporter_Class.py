@@ -211,12 +211,17 @@ class Dicom_Reporter(object):
                             continue
                         dicom_filenames = series_reader.GetGDCMSeriesFileNames(dicom_folder, series_id)
                         file_reader.SetFileName(dicom_filenames[0])
-                        file_reader.Execute()
+                        try:
+                            file_reader.Execute()
+                        except:
+                            print('Reader failed on {} {}'.format(dicom_folder, series_id))
+                            continue
                         self.dictionary_creator(series_id, dicom_filenames, file_reader)
 
                     # this is to read RTSTRUCT
                     rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
-                    self.rtstruct_reader(rtstruct_files)
+                    if rtstruct_files:
+                        self.rtstruct_reader(rtstruct_files)
                 except:
                     print('Failed on {}'.format(dicom_folder))
                 q.task_done()

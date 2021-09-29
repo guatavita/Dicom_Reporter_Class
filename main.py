@@ -22,7 +22,7 @@ def main():
                                     save_json=True,
                                     load_json=True,
                                     supp_tags=supp_tags,
-                                    nb_threads=24, verbose=True, **mg_template)
+                                    nb_threads=16, verbose=True, **mg_template)
     dicom_explorer.run_conversion()
 
 
