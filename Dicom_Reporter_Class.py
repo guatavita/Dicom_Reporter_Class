@@ -48,36 +48,34 @@ def splitext_(path):
 
 class AddDicomSeriesToDict(object):
     def __init__(self):
-        self.series_reader = sitk.ImageSeriesReader()
-        self.series_reader.SetGlobalWarningDisplay(False)
-
         self.file_reader = sitk.ImageFileReader()
         self.file_reader.SetGlobalWarningDisplay(False)
         self.file_reader.LoadPrivateTagsOn()
 
     def run(self, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
-        # GetGDCMSeriesIDs seems to be randomly unstable whith multithread (memory management issue?)
-        # series_ids_list = self.series_reader.GetGDCMSeriesIDs(dicom_folder)
-        series_ids_list = get_unique_series_ids(dicom_folder)
+        series_ids_dict = get_unique_series_ids_filenames(dicom_folder)
+        for series_id in list(series_ids_dict.keys()):
+            if series_id not in dicom_dict and series_id not in rd_dict:
+                dicom_filenames = series_ids_dict.get(series_id)
+                self.file_reader.SetFileName(dicom_filenames[0])
+                try:
+                    self.file_reader.Execute()
+                except:
+                    print('Reader failed on {} {}'.format(dicom_folder, series_id))
+                    continue
+                dictionary_creator(series_id, dicom_filenames, self.file_reader, dicom_dict, rd_dict, tags_dict)
 
-        # for series_id in series_ids_list:
-        #     if series_id not in dicom_dict and series_id not in rd_dict:
-        #         dicom_filenames = self.series_reader.GetGDCMSeriesFileNames(dicom_folder, series_id)
-        #         self.file_reader.SetFileName(dicom_filenames[0])
-        #         try:
-        #             self.file_reader.Execute()
-        #         except:
-        #             print('Reader failed on {} {}'.format(dicom_folder, series_id))
-        #             continue
-        #         dictionary_creator(series_id, dicom_filenames, self.file_reader, dicom_dict, rd_dict, tags_dict)
-
-        # # this is to read RTSTRUCT
-        # rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
-        # if rtstruct_files:
-        #     rtstruct_reader(rtstruct_files, rt_dict, tags_dict)
+        # this is to read RTSTRUCT
+        rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
+        if rtstruct_files:
+            rtstruct_reader_to_dict(rtstruct_files, rt_dict, tags_dict)
 
 
 def get_unique_series_ids(dicom_folder):
+    '''
+    :param dicom_folder:
+    :return: list of unique seriesID in the folder
+    '''
     series_id_list = []
     filenames = glob.glob(os.path.join(dicom_folder, "*.dcm"))
     for filename in filenames:
@@ -91,31 +89,33 @@ def get_unique_series_ids(dicom_folder):
     return series_id_list
 
 
-def dicom_reader_worker(A):
-    q = A[0]
-    while True:
-        item = q.get()
-        if item is None:
-            break
-        else:
-            it, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, verbose = item
-            dicom_series_to_dict = AddDicomSeriesToDict()
-            if verbose:
-                print("{}: {}".format(it, dicom_folder))
-            try:
-                dicom_series_to_dict.run(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
-            except:
-                print('Failed on {}'.format(dicom_folder))
-        q.task_done()
+def get_unique_series_ids_filenames(dicom_folder):
+    '''
+    :param dicom_folder:
+    :return: dictionary with list of .dcm files per seriesID
+    '''
+    series_id_filenames = {}
+    filenames = glob.glob(os.path.join(dicom_folder, "*.dcm"))
+    for filename in filenames:
+        try:
+            ds = pydicom.read_file(filename)
+        except:
+            continue
+        series_id = ds.get('SeriesInstanceUID')
+        if series_id not in series_id_filenames:
+            series_id_filenames[series_id] = []
+        series_id_filenames[series_id].append(filename)
+    return series_id_filenames
 
 
-def return_series_ids(reader, input_folder, get_filenames=False):
+def return_sitk_series_ids(reader, input_folder, get_filenames=False):
     '''
     :param reader: sitk.ImageSeriesReader
     :param input_folder:
     :param get_filenames: dictionary or list of the series ID per dicom
     :return:
     '''
+    # GetGDCMSeriesIDs seems to be randomly unstable with multi-threads (memory management issue?)
     series_ids_list = reader.GetGDCMSeriesIDs(input_folder)
     if get_filenames:
         series_dict = {}
@@ -156,7 +156,7 @@ def dictionary_creator(series_id, dicom_filenames, reader, dicom_dict, rd_dict, 
             dicom_dict[series_id] = series_dict
 
 
-def rtstruct_reader(rtstruct_files, rt_dict, tags_dict):
+def rtstruct_reader_to_dict(rtstruct_files, rt_dict, tags_dict):
     for rtstruct_file in rtstruct_files:
         try:
             ds = pydicom.read_file(rtstruct_file)
@@ -176,6 +176,24 @@ def rtstruct_reader(rtstruct_files, rt_dict, tags_dict):
                 series_dict[tag_name] = ds.get(tag_name)
 
             rt_dict[series_id] = series_dict
+
+
+def dicom_reader_worker(A):
+    q = A[0]
+    while True:
+        item = q.get()
+        if item is None:
+            break
+        else:
+            it, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, verbose = item
+            dicom_series_to_dict = AddDicomSeriesToDict()
+            if verbose:
+                print("{}: {}".format(it, dicom_folder))
+            try:
+                dicom_series_to_dict.run(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
+            except:
+                print('Failed on {}'.format(dicom_folder))
+        q.task_done()
 
 
 class Dicom_Reporter(object):
