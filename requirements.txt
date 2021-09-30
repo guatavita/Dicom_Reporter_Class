@@ -6,4 +6,3 @@ opencv-python
 matplotlib
 ipywidgets
 pathvalidate
-tqdm
