@@ -58,13 +58,7 @@ class AddDicomSeriesToDict(object):
         for series_id in list(series_ids_dict.keys()):
             if series_id not in dicom_dict and series_id not in rd_dict:
                 dicom_filenames = series_ids_dict.get(series_id)
-                self.file_reader.SetFileName(dicom_filenames[0])
-                try:
-                    self.file_reader.Execute()
-                except:
-                    print('Reader failed on {} {}'.format(dicom_folder, series_id))
-                    continue
-                dictionary_creator(series_id, dicom_filenames, self.file_reader, dicom_dict, rd_dict, tags_dict)
+                dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, tags_dict)
 
         # this is to read RTSTRUCT
         rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
@@ -127,27 +121,24 @@ def return_sitk_series_ids(reader, input_folder, get_filenames=False):
         return series_ids_list
 
 
-def dictionary_creator(series_id, dicom_filenames, reader, dicom_dict, rd_dict, tags_dict):
+def dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, tags_dict):
     '''
     :param series_id:
     :param dicom_filenames: list
-    :param reader: sitk.ImageFileReader()
     :return:
     '''
+
+    try:
+        ds = pydicom.read_file(dicom_filenames[0])
+    except:
+        print("Dicom cannot be read {}".format(dicom_filenames[0]))
+        return
+
     series_dict = {}
     series_dict['dicom_filenames'] = dicom_filenames
-    if reader.HasMetaDataKey('0008|0060'):
-        modality = reader.GetMetaData('0008|0060')
-    else:
-        modality = 'Unknown'
-
+    modality = ds.get('Modality')
     for tag_name in list(tags_dict.keys()):
-        tag_key = tags_dict.get(tag_name)
-        if tag_key:
-            if reader.HasMetaDataKey(tag_key):
-                series_dict[tag_name] = reader.GetMetaData(tag_key)
-            else:
-                series_dict[tag_name] = None
+        series_dict[tag_name] = ds.get(tag_name)
 
     if modality.lower() == 'rtdose':
         if series_id not in rd_dict:

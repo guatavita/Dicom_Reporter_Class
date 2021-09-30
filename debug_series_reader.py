@@ -28,7 +28,6 @@ class Dicom_Reader(object):
             else:
                 it, dicom_folder = item
                 reader = sitk.ImageSeriesReader()
-                reader.SetGlobalWarningDisplay(False)
                 print('running {} {}'.format(it, dicom_folder))
                 try:
                     series_ids_list = reader.GetGDCMSeriesIDs(dicom_folder)
