@@ -56,7 +56,9 @@ class AddDicomSeriesToDict(object):
         self.file_reader.LoadPrivateTagsOn()
 
     def run(self, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
-        self.series_reader.GetGDCMSeriesIDs(dicom_folder)
+        # GetGDCMSeriesIDs seems to be randomly unstable whith multithread (memory management issue?)
+        # series_ids_list = self.series_reader.GetGDCMSeriesIDs(dicom_folder)
+        series_ids_list = get_unique_series_ids(dicom_folder)
 
         # for series_id in series_ids_list:
         #     if series_id not in dicom_dict and series_id not in rd_dict:
@@ -73,6 +75,20 @@ class AddDicomSeriesToDict(object):
         # rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
         # if rtstruct_files:
         #     rtstruct_reader(rtstruct_files, rt_dict, tags_dict)
+
+
+def get_unique_series_ids(dicom_folder):
+    series_id_list = []
+    filenames = glob.glob(os.path.join(dicom_folder, "*.dcm"))
+    for filename in filenames:
+        try:
+            ds = pydicom.read_file(filename)
+        except:
+            continue
+        series_id = ds.get('SeriesInstanceUID')
+        if series_id not in series_id_list:
+            series_id_list.append(series_id)
+    return series_id_list
 
 
 def dicom_reader_worker(A):
@@ -95,8 +111,10 @@ def dicom_reader_worker(A):
 
 def return_series_ids(reader, input_folder, get_filenames=False):
     '''
+    :param reader: sitk.ImageSeriesReader
     :param input_folder:
-    :return: dictionary or list of the series ID per dicom
+    :param get_filenames: dictionary or list of the series ID per dicom
+    :return:
     '''
     series_ids_list = reader.GetGDCMSeriesIDs(input_folder)
     if get_filenames:
