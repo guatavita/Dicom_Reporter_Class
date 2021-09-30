@@ -57,7 +57,8 @@ class AddDicomSeriesToDict(object):
         self.file_reader.LoadPrivateTagsOn()
 
     def run(self, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
-        series_ids_list = self.series_reader.GetGDCMSeriesIDs(dicom_folder)
+        xxx=1
+        # series_ids_list = self.series_reader.GetGDCMSeriesIDs(dicom_folder)
 
         # for series_id in series_ids_list:
         #     if series_id not in dicom_dict and series_id not in rd_dict:
