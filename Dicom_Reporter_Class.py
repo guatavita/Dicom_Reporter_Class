@@ -59,16 +59,16 @@ class AddDicomSeriesToDict(object):
     def run(self, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
         series_ids_list = self.series_reader.GetGDCMSeriesIDs(dicom_folder)
 
-        for series_id in series_ids_list:
-            if series_id not in dicom_dict and series_id not in rd_dict:
-                dicom_filenames = self.series_reader.GetGDCMSeriesFileNames(dicom_folder, series_id)
-                self.file_reader.SetFileName(dicom_filenames[0])
-                try:
-                    self.file_reader.Execute()
-                except:
-                    print('Reader failed on {} {}'.format(dicom_folder, series_id))
-                    continue
-                # dictionary_creator(series_id, dicom_filenames, self.file_reader, dicom_dict, rd_dict, tags_dict)
+        # for series_id in series_ids_list:
+        #     if series_id not in dicom_dict and series_id not in rd_dict:
+        #         dicom_filenames = self.series_reader.GetGDCMSeriesFileNames(dicom_folder, series_id)
+        #         self.file_reader.SetFileName(dicom_filenames[0])
+        #         try:
+        #             self.file_reader.Execute()
+        #         except:
+        #             print('Reader failed on {} {}'.format(dicom_folder, series_id))
+        #             continue
+        #         dictionary_creator(series_id, dicom_filenames, self.file_reader, dicom_dict, rd_dict, tags_dict)
 
         # # this is to read RTSTRUCT
         # rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
