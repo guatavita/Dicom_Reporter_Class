@@ -47,23 +47,17 @@ def splitext_(path):
     return os.path.splitext(path)
 
 
-class AddDicomSeriesToDict(object):
-    def __init__(self):
-        self.file_reader = sitk.ImageFileReader()
-        self.file_reader.SetGlobalWarningDisplay(False)
-        self.file_reader.LoadPrivateTagsOn()
+def AddDicomSeriesToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
+    series_ids_dict = get_unique_series_ids_filenames(dicom_folder)
+    for series_id in list(series_ids_dict.keys()):
+        if series_id not in dicom_dict and series_id not in rd_dict:
+            dicom_filenames = series_ids_dict.get(series_id)
+            dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, tags_dict)
 
-    def run(self, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
-        series_ids_dict = get_unique_series_ids_filenames(dicom_folder)
-        for series_id in list(series_ids_dict.keys()):
-            if series_id not in dicom_dict and series_id not in rd_dict:
-                dicom_filenames = series_ids_dict.get(series_id)
-                dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, tags_dict)
-
-        # this is to read RTSTRUCT
-        rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
-        if rtstruct_files:
-            rtstruct_reader_to_dict(rtstruct_files, rt_dict, tags_dict)
+    # this is to read RTSTRUCT
+    rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
+    if rtstruct_files:
+        rtstruct_reader_to_dict(rtstruct_files, rt_dict, tags_dict)
 
 
 def get_unique_series_ids(dicom_folder):
