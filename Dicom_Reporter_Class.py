@@ -68,12 +68,12 @@ class AddDicomSeriesToDict(object):
                 except:
                     print('Reader failed on {} {}'.format(dicom_folder, series_id))
                     continue
-                dictionary_creator(series_id, dicom_filenames, self.file_reader, dicom_dict, rd_dict, tags_dict)
+                # dictionary_creator(series_id, dicom_filenames, self.file_reader, dicom_dict, rd_dict, tags_dict)
 
-        # this is to read RTSTRUCT
-        rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
-        if rtstruct_files:
-            rtstruct_reader(rtstruct_files, rt_dict, tags_dict)
+        # # this is to read RTSTRUCT
+        # rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
+        # if rtstruct_files:
+        #     rtstruct_reader(rtstruct_files, rt_dict, tags_dict)
 
 
 def dicom_reader_worker(A):
