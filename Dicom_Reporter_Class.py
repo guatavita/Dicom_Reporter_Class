@@ -48,13 +48,12 @@ def splitext_(path):
 
 
 def AddDicomSeriesToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
+    # TODO read partial pydicom with ds = pydicom.dcmread(filename, stop_before_pixels=True)?
     series_ids_dict = get_unique_series_ids_filenames(dicom_folder)
     for series_id in list(series_ids_dict.keys()):
         if series_id not in dicom_dict and series_id not in rd_dict:
             dicom_filenames = series_ids_dict.get(series_id)
             dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, tags_dict)
-
-    # this is to read RTSTRUCT
     rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
     if rtstruct_files:
         rtstruct_reader_to_dict(rtstruct_files, rt_dict, tags_dict)
@@ -69,7 +68,7 @@ def get_unique_series_ids(dicom_folder):
     filenames = glob.glob(os.path.join(dicom_folder, "*.dcm"))
     for filename in filenames:
         try:
-            ds = pydicom.read_file(filename)
+            ds = pydicom.dcmread(filename, stop_before_pixels=True)
         except:
             continue
         series_id = ds.get('SeriesInstanceUID')
@@ -87,7 +86,7 @@ def get_unique_series_ids_filenames(dicom_folder):
     filenames = glob.glob(os.path.join(dicom_folder, "*.dcm"))
     for filename in filenames:
         try:
-            ds = pydicom.read_file(filename)
+            ds = pydicom.dcmread(filename, stop_before_pixels=True)
         except:
             continue
         series_id = ds.get('SeriesInstanceUID')
@@ -123,7 +122,7 @@ def dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, tags_dic
     '''
 
     try:
-        ds = pydicom.read_file(dicom_filenames[0])
+        ds = pydicom.dcmread(dicom_filenames[0], stop_before_pixels=True)
     except:
         print("Dicom cannot be read {}".format(dicom_filenames[0]))
         return
@@ -145,7 +144,7 @@ def dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, tags_dic
 def rtstruct_reader_to_dict(rtstruct_files, rt_dict, tags_dict):
     for rtstruct_file in rtstruct_files:
         try:
-            ds = pydicom.read_file(rtstruct_file)
+            ds = pydicom.dcmread(rtstruct_file)
         except:
             print("Dicom cannot be read {}".format(rtstruct_file))
             return
