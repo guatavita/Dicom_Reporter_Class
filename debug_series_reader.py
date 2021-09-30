@@ -56,7 +56,7 @@ class Dicom_Reader(object):
 
 
 def main():
-    input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
+    input_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_TEST'
     dicom_explorer = Dicom_Reader(input_dir=input_dir)
 
 
