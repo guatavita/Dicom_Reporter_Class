@@ -53,10 +53,7 @@ def AddDicomSeriesToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
     for series_id in list(series_ids_dict.keys()):
         if series_id not in dicom_dict and series_id not in rd_dict:
             dicom_filenames = series_ids_dict.get(series_id)
-            dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, tags_dict)
-    rtstruct_files = glob.glob(os.path.join(dicom_folder, 'RS*.dcm'))
-    if rtstruct_files:
-        rtstruct_reader_to_dict(rtstruct_files, rt_dict, tags_dict)
+            dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, rt_dict, tags_dict)
 
 
 def get_unique_series_ids(dicom_folder):
@@ -114,7 +111,7 @@ def return_sitk_series_ids(reader, input_folder, get_filenames=False):
         return series_ids_list
 
 
-def dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, tags_dict):
+def dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, rt_dict, tags_dict):
     '''
     :param series_id:
     :param dicom_filenames: list
@@ -139,6 +136,9 @@ def dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, tags_dic
     if modality.lower() == 'rtdose':
         if series_id not in rd_dict:
             rd_dict[series_id] = series_dict
+    elif modality.lower() == 'rtstruct':
+        if series_id not in rt_dict:
+            rt_dict[series_id] = series_dict
     else:
         if series_id not in dicom_dict:
             dicom_dict[series_id] = series_dict
