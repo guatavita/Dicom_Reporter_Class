@@ -7,7 +7,7 @@ import SimpleITK as sitk
 
 
 class Dicom_Reader(object):
-    def __init__(self, input_dir, nb_threads=int(0.5 * cpu_count())):
+    def __init__(self, input_dir, nb_threads=int(0.9 * cpu_count())):
         self.input_dir = input_dir
         self.folders_with_dcm = []
         self.nb_threads = nb_threads
@@ -57,7 +57,7 @@ class Dicom_Reader(object):
 
 def main():
     input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
-    dicom_explorer = Dicom_Reader(input_dir=input_dir, nb_threads=30)
+    dicom_explorer = Dicom_Reader(input_dir=input_dir)
 
 
 if __name__ == '__main__':
