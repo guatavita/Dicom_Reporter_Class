@@ -2,7 +2,6 @@ tqdm
 numpy
 SimpleITK
 pydicom
-python-gdcm
 opencv-python
 matplotlib
 ipywidgets

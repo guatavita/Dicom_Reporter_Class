@@ -8,11 +8,8 @@ from queue import *
 from pathvalidate import sanitize_filepath
 import numpy as np
 import SimpleITK as sitk
-import gdcm
 import pydicom
 import cv2
-
-lock = threading.Lock()
 
 tags = {
     'SOPClassUID': '0008|0016',
@@ -59,8 +56,8 @@ class AddDicomSeriesToDict(object):
         self.file_reader.LoadPrivateTagsOn()
 
     def run(self, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
-        with lock:
-            series_ids_list = self.series_reader.GetGDCMSeriesIDs(dicom_folder)
+
+        series_ids_list = self.series_reader.GetGDCMSeriesIDs(dicom_folder)
 
         # for series_id in series_ids_list:
         #     if series_id not in dicom_dict and series_id not in rd_dict:
