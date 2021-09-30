@@ -302,7 +302,6 @@ class Dicom_Reporter(object):
         if self.verbose:
             print("A total of {} folders with DICOM files was found".format(len(self.folders_with_dcm)))
             print("Elapsed time {}s".format(int(time.time() - time_start)))
-            print("A total of {} unique folders with DICOM files was found".format(len(list(dict.fromkeys(self.folders_with_dcm)))))
 
     def dicom_explorer(self):
         q = Queue(maxsize=self.nb_threads)
