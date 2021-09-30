@@ -131,7 +131,10 @@ def dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, tags_dic
     series_dict['dicom_filenames'] = dicom_filenames
     modality = ds.get('Modality')
     for tag_name in list(tags_dict.keys()):
-        series_dict[tag_name] = ds.get(tag_name)
+        if tag_name == 'PatientName':
+            series_dict[tag_name] = str(ds.get(tag_name))
+        else:
+            series_dict[tag_name] = ds.get(tag_name)
 
     if modality.lower() == 'rtdose':
         if series_id not in rd_dict:
