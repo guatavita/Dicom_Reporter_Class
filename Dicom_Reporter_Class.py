@@ -89,7 +89,17 @@ def get_unique_series_ids_filenames(dicom_folder):
         series_id = ds.get('SeriesInstanceUID')
         if series_id not in series_id_filenames:
             series_id_filenames[series_id] = []
-        series_id_filenames[series_id].append(filename)
+
+        if ds.get('SliceLocation'):
+            slice_loc = float(ds.get('SliceLocation'))
+        else:
+            slice_loc = 0
+        series_id_filenames[series_id].append([slice_loc, filename])
+
+    for series_id in list(series_id_filenames.keys()):
+        series_id_filenames.get(series_id).sort()
+        series_id_filenames[series_id] = [i[-1] for i in series_id_filenames.get(series_id)]
+
     return series_id_filenames
 
 
