@@ -55,9 +55,8 @@ class AddDicomSeriesToDict(object):
         self.file_reader.SetGlobalWarningDisplay(False)
         self.file_reader.LoadPrivateTagsOn()
 
-    def run(self, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
-
-        series_ids_list = self.series_reader.GetGDCMSeriesIDs(dicom_folder)
+    def run(self, dicom_folder, series_ids_list, dicom_dict, rd_dict, rt_dict, tags_dict):
+        xxx = 1
 
         # for series_id in series_ids_list:
         #     if series_id not in dicom_dict and series_id not in rd_dict:
@@ -83,12 +82,12 @@ def dicom_reader_worker(A):
         if item is None:
             break
         else:
-            it, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, verbose = item
+            it, dicom_folder, dicom_dict, series_ids_list, rd_dict, rt_dict, tags_dict, verbose = item
             dicom_series_to_dict = AddDicomSeriesToDict()
             if verbose:
                 print("{}: {}".format(it, dicom_folder))
             try:
-                dicom_series_to_dict.run(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
+                dicom_series_to_dict.run(dicom_folder, series_ids_list, dicom_dict, rd_dict, rt_dict, tags_dict)
             except:
                 print('Failed on {}'.format(dicom_folder))
         q.task_done()
@@ -205,6 +204,10 @@ class Dicom_Reporter(object):
         # folder that contains dicom
         self.folders_with_dcm = []
 
+        # sitk series reader to get series list outside threads
+        self.series_reader = sitk.ImageSeriesReader()
+        self.series_reader.SetGlobalWarningDisplay(False)
+
         # class init
         self.create_contour_association()
         self.load_dcm_report()
@@ -314,7 +317,8 @@ class Dicom_Reporter(object):
             time_start = time.time()
             print("\nReading DICOM:")
         for it, dicom_folder in enumerate(self.folders_with_dcm):
-            item = [it, dicom_folder, self.dicom_dict, self.rd_dict, self.rt_dict, self.tags_dict, self.verbose]
+            series_ids_list = self.series_reader.GetGDCMSeriesIDs(dicom_folder)
+            item = [it, dicom_folder, series_ids_list, self.dicom_dict, self.rd_dict, self.rt_dict, self.tags_dict, self.verbose]
             q.put(item)
 
         for worker in range(self.nb_threads):
