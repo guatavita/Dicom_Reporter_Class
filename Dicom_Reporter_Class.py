@@ -169,9 +169,8 @@ def dicom_reader_worker(A):
             break
         else:
             dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, verbose = item
-            dicom_series_to_dict = AddDicomSeriesToDict()
             try:
-                dicom_series_to_dict.run(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
+                AddDicomSeriesToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
             except:
                 print('Failed on {}'.format(dicom_folder))
         q.task_done()
