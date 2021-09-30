@@ -10,6 +10,7 @@ import numpy as np
 import SimpleITK as sitk
 import pydicom
 import cv2
+from tqdm import tqdm
 
 tags = {
     'SOPClassUID': '0008|0016',
@@ -163,9 +164,7 @@ def rtstruct_reader_to_dict(rtstruct_files, rt_dict, tags_dict):
         except:
             print("Dicom cannot be read {}".format(rtstruct_file))
             return
-
         series_id = ds.get('SeriesInstanceUID')
-
         if series_id not in rt_dict:
             series_dict = {}
             series_dict['dicom_filenames'] = [rtstruct_file]
@@ -174,7 +173,6 @@ def rtstruct_reader_to_dict(rtstruct_files, rt_dict, tags_dict):
                 if not tag_key:
                     continue
                 series_dict[tag_name] = ds.get(tag_name)
-
             rt_dict[series_id] = series_dict
 
 
@@ -185,10 +183,8 @@ def dicom_reader_worker(A):
         if item is None:
             break
         else:
-            it, dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, verbose = item
+            dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, verbose = item
             dicom_series_to_dict = AddDicomSeriesToDict()
-            if verbose:
-                print("{}: {}".format(it, dicom_folder))
             try:
                 dicom_series_to_dict.run(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
             except:
@@ -347,8 +343,8 @@ class Dicom_Reporter(object):
         if self.verbose:
             time_start = time.time()
             print("\nReading DICOM:")
-        for it, dicom_folder in enumerate(self.folders_with_dcm):
-            item = [it, dicom_folder, self.dicom_dict, self.rd_dict, self.rt_dict, self.tags_dict, self.verbose]
+        for dicom_folder in tqdm(self.folders_with_dcm):
+            item = [dicom_folder, self.dicom_dict, self.rd_dict, self.rt_dict, self.tags_dict, self.verbose]
             q.put(item)
 
         for worker in range(self.nb_threads):
@@ -534,7 +530,7 @@ class Dicom_Reporter(object):
         if self.verbose:
             time_start = time.time()
             print("\nConverting DICOM:")
-        for series_id in list(self.dicom_dict.keys()):
+        for series_id in tqdm(list(self.dicom_dict.keys())):
             output_path = os.path.join(self.output_dir, self.dicom_dict[series_id]['PatientID'].rstrip())
 
             if not os.path.exists(output_path):
