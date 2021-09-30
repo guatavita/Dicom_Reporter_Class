@@ -458,13 +458,13 @@ class Dicom_Reporter(object):
                 try:
                     if self.merge_study_serie_desc:
                         description = "{}_{}".format(
-                            self.dicom_dict[series_id]['StudyDescription'].rstrip().replace(' ', '_'),
-                            self.dicom_dict[series_id]['SeriesDescription'].rstrip().replace(' ', '_'))
+                            str(self.dicom_dict[series_id]['StudyDescription']).rstrip().replace(' ', '_'),
+                            str(self.dicom_dict[series_id]['SeriesDescription']).rstrip().replace(' ', '_'))
                     else:
                         if self.study_desc_name:
-                            description = self.dicom_dict[series_id]['StudyDescription'].rstrip().replace(' ', '_')
+                            description = str(self.dicom_dict[series_id]['StudyDescription']).rstrip().replace(' ', '_')
                         else:
-                            description = self.dicom_dict[series_id]['SeriesDescription'].rstrip().replace(' ', '_')
+                            description = str(self.dicom_dict[series_id]['SeriesDescription']).rstrip().replace(' ', '_')
 
                     description = ''.join(e for e in description if e.isalnum() or e == '_')
                     if self.dicom_dict[series_id]['PresentationIntentType']:
