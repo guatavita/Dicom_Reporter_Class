@@ -6,3 +6,4 @@ opencv-python
 matplotlib
 ipywidgets
 pathvalidate
+python-gdcm
