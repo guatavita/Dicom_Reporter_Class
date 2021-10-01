@@ -371,16 +371,24 @@ class Dicom_Reporter(object):
     def dicom_to_sitk(self, lstFilesDCM):
         # Get ref file
         RefDs = pydicom.read_file(lstFilesDCM[0])
-        # Load dimensions based on the number of rows, columns, and slices (along the Z axis)
-        ConstPixelDims = (len(lstFilesDCM), int(RefDs.Rows), int(RefDs.Columns))
+        if RefDs.get('NumberOfFrames'):
+            # Load dimensions based on the number of rows, columns, and slices (along the Z axis)
+            ConstPixelDims = (int(RefDs.NumberOfFrames), int(RefDs.Rows), int(RefDs.Columns))
+        else:
+            # Load dimensions based on the number of rows, columns, and slices (along the Z axis)
+            ConstPixelDims = (len(lstFilesDCM), int(RefDs.Rows), int(RefDs.Columns))
         # The array is sized based on 'ConstPixelDims'
         ArrayDicom = np.zeros(ConstPixelDims, dtype=RefDs.pixel_array.dtype)
-        # loop through all the DICOM files
-        for filenameDCM in lstFilesDCM:
-            # read the file
-            ds = pydicom.read_file(filenameDCM)
-            # store the raw image data
-            ArrayDicom[lstFilesDCM.index(filenameDCM), ...] = ds.pixel_array
+
+        if len(lstFilesDCM) > 1:
+            # loop through all the DICOM files
+            for filenameDCM in lstFilesDCM:
+                # read the file
+                ds = pydicom.read_file(filenameDCM)
+                # store the raw image data
+                ArrayDicom[lstFilesDCM.index(filenameDCM), ...] = ds.pixel_array
+        else:
+            ArrayDicom = RefDs.pixel_array
 
         if RefDs.get('SliceThickness'):
             slice_thickness = RefDs.get('SliceThickness')
@@ -389,8 +397,15 @@ class Dicom_Reporter(object):
         ArrayDicom = pydicom.pixel_data_handlers.apply_rescale(ArrayDicom, RefDs)
         # maybe use RefDs.ImageOrientationPatient
         identity_direction = tuple(np.identity(len(ConstPixelDims)).flatten())
-        spacing = tuple(np.array(RefDs.PixelSpacing, dtype=np.float)) + (np.float(slice_thickness),)
-        origin = tuple(np.array(RefDs.ImagePositionPatient, dtype=np.float))
+        if RefDs.get('PixelSpacing'):
+            spacing = tuple(np.array(RefDs.PixelSpacing, dtype=np.float)) + (np.float(slice_thickness),)
+        else:
+            spacing = (1.0, 1.0,) + (np.float(slice_thickness),)
+
+        if RefDs.get('ImagePositionPatient'):
+            origin = tuple(np.array(RefDs.ImagePositionPatient, dtype=np.float))
+        else:
+            origin = (0, 0, 0)
         sitk_pointer = sitk.GetImageFromArray(ArrayDicom)
         sitk_pointer.SetDirection(identity_direction)
         sitk_pointer.SetSpacing(spacing)
@@ -485,27 +500,8 @@ class Dicom_Reporter(object):
             if item is None:
                 break
             else:
-                series_id, output_path = item
+                series_id, output_dir = item
                 try:
-                    if self.merge_study_serie_desc:
-                        description = "{}_{}".format(
-                            str(self.dicom_dict[series_id]['StudyDescription']).rstrip().replace(' ', '_'),
-                            str(self.dicom_dict[series_id]['SeriesDescription']).rstrip().replace(' ', '_'))
-                    else:
-                        if self.study_desc_name:
-                            description = str(self.dicom_dict[series_id]['StudyDescription']).rstrip().replace(' ', '_')
-                        else:
-                            description = str(self.dicom_dict[series_id]['SeriesDescription']).rstrip().replace(' ', '_')
-
-                    description = ''.join(e for e in description if e.isalnum() or e == '_')
-                    if self.dicom_dict[series_id]['PresentationIntentType']:
-                        description += '_{}'.format(
-                            self.dicom_dict[series_id]['PresentationIntentType'].replace(' ', '_'))
-                    output_dir = os.path.join(output_path,
-                                              '{}'.format(self.dicom_dict[series_id]['StudyDate']),
-                                              '{}'.format(description))
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
                     if self.image_series_id:
                         output_filename = os.path.join(output_dir, 'image_series_{}.nii.gz'.format(series_id))
                     else:
@@ -525,9 +521,8 @@ class Dicom_Reporter(object):
                     if self.dicom_dict[series_id].get('RTSTRUCT'):
                         self.rtstruct_writer(output_dir=output_dir, dicom_handle=dicom_handle,
                                              rtstruct_series=self.dicom_dict[series_id]['RTSTRUCT'])
-
                 except:
-                    print('Failed on {} {}'.format(series_id, output_path))
+                    print('Failed on {} {}'.format(series_id, output_dir))
                 q.task_done()
 
     def run_conversion(self):
@@ -548,10 +543,27 @@ class Dicom_Reporter(object):
         for series_id in tqdm(list(self.dicom_dict.keys())):
             output_path = os.path.join(self.output_dir, self.dicom_dict[series_id]['PatientID'].rstrip())
 
-            if not os.path.exists(output_path):
-                os.makedirs(output_path)
+            if self.merge_study_serie_desc:
+                description = "{}_{}".format(
+                    str(self.dicom_dict[series_id]['StudyDescription']).rstrip().replace(' ', '_'),
+                    str(self.dicom_dict[series_id]['SeriesDescription']).rstrip().replace(' ', '_'))
+            else:
+                if self.study_desc_name:
+                    description = str(self.dicom_dict[series_id]['StudyDescription']).rstrip().replace(' ', '_')
+                else:
+                    description = str(self.dicom_dict[series_id]['SeriesDescription']).rstrip().replace(' ', '_')
 
-            item = [series_id, output_path]
+            description = ''.join(e for e in description if e.isalnum() or e == '_')
+            if self.dicom_dict[series_id]['PresentationIntentType']:
+                description += '_{}'.format(
+                    self.dicom_dict[series_id]['PresentationIntentType'].replace(' ', '_'))
+            output_dir = os.path.join(output_path,
+                                      '{}'.format(self.dicom_dict[series_id]['StudyDate']),
+                                      '{}'.format(description))
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+
+            item = [series_id, output_dir]
             q.put(item)
 
         for worker in range(self.nb_threads):
