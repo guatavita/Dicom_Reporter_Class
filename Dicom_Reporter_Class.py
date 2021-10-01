@@ -476,8 +476,9 @@ class Dicom_Reporter(object):
                         for contour_sequence in roi_contour.ContourSequence:
                             pts_list = [contour_sequence.ContourData[i:i + 3] for i in
                                         range(0, len(contour_sequence.ContourData), 3)]
-                            pts_array = (np.array(pts_list) - ref_origin) / ref_spacing
-                            slice_mask = cv2.fillPoly(np.zeros(ref_size[:2]), pts=[pts_array[:, :2].astype(np.int32)],
+                            # pts_array = (np.array(pts_list) - ref_origin) / ref_spacing
+                            pts_array = np.array([dicom_handle.TransformPhysicalPointToIndex(i) for i in np.array(pts_list)])
+                            slice_mask = cv2.fillPoly(np.zeros(ref_size[:2]), pts=[pts_array[:, :2]],
                                                       color=(255, 255, 255))
                             slice_id = int(pts_array[0, 2])
                             if np.any(mask[slice_id, :, :][slice_mask > 0]) == 1:
