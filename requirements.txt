@@ -1,7 +1,7 @@
 tqdm
 numpy
 SimpleITK
-pydicom
+pydicom=>2.2.1
 opencv-python
 matplotlib
 ipywidgets
