@@ -368,6 +368,35 @@ class Dicom_Reporter(object):
                     nb_rtstruct += len(self.rt_dict[series_id]['dicom_filenames'])
                 print("Nb RTSTRUCT files to process: {}".format(nb_rtstruct))
 
+    def dicom_to_sitk(self, lstFilesDCM):
+        # Get ref file
+        RefDs = pydicom.read_file(lstFilesDCM[0])
+        # Load dimensions based on the number of rows, columns, and slices (along the Z axis)
+        ConstPixelDims = (len(lstFilesDCM), int(RefDs.Rows), int(RefDs.Columns))
+        # The array is sized based on 'ConstPixelDims'
+        ArrayDicom = np.zeros(ConstPixelDims, dtype=RefDs.pixel_array.dtype)
+        # loop through all the DICOM files
+        for filenameDCM in lstFilesDCM:
+            # read the file
+            ds = pydicom.read_file(filenameDCM)
+            # store the raw image data
+            ArrayDicom[lstFilesDCM.index(filenameDCM), ...] = ds.pixel_array
+
+        if RefDs.get('SliceThickness'):
+            slice_thickness = RefDs.get('SliceThickness')
+        else:
+            slice_thickness = 1
+        ArrayDicom = pydicom.pixel_data_handlers.apply_rescale(ArrayDicom, RefDs)
+        # maybe use RefDs.ImageOrientationPatient
+        identity_direction = tuple(np.identity(len(ConstPixelDims)).flatten())
+        spacing = tuple(np.array(RefDs.PixelSpacing, dtype=np.float)) + (np.float(slice_thickness),)
+        origin = tuple(np.array(RefDs.ImagePositionPatient, dtype=np.float))
+        sitk_pointer = sitk.GetImageFromArray(ArrayDicom)
+        sitk_pointer.SetDirection(identity_direction)
+        sitk_pointer.SetSpacing(spacing)
+        sitk_pointer.SetOrigin(origin)
+        return sitk_pointer
+
     def rtdose_writer(self, output_dir, rtdose_series=[], dicom_handle=None):
         '''
         :param output_dir: output directory
@@ -375,16 +404,12 @@ class Dicom_Reporter(object):
         :param dicom_handle: reference dicom to resample RTDOSE if available
         :return:
         '''
-        reader = sitk.ImageSeriesReader()
-        reader.SetGlobalWarningDisplay(False)
-        reader.MetaDataDictionaryArrayUpdateOff()
-        reader.LoadPrivateTagsOff()
+
         i = 0
         for rtdose_series_id in rtdose_series:
             if not self.rd_dict.get(rtdose_series_id):
                 continue
-            reader.SetFileNames(self.rd_dict[rtdose_series_id]['dicom_filenames'])
-            dose_handle = reader.Execute()
+            dose_handle = self.dicom_to_sitk(self.rd_dict[rtdose_series_id]['dicom_filenames'])
             origin = dose_handle.GetOrigin()
             spacing = dose_handle.GetSpacing()
             dose_array = np.squeeze(sitk.GetArrayFromImage(dose_handle).astype(np.float32))
@@ -461,10 +486,6 @@ class Dicom_Reporter(object):
                 break
             else:
                 series_id, output_path = item
-                reader = sitk.ImageSeriesReader()
-                reader.SetGlobalWarningDisplay(False)
-                reader.MetaDataDictionaryArrayUpdateOff()
-                reader.LoadPrivateTagsOff()
                 try:
                     if self.merge_study_serie_desc:
                         description = "{}_{}".format(
@@ -491,12 +512,10 @@ class Dicom_Reporter(object):
                         output_filename = os.path.join(output_dir, 'image.nii.gz')
 
                     if self.force_rewrite or not os.path.exists(output_filename):
-                        reader.SetFileNames(self.dicom_dict[series_id]['dicom_filenames'])
-                        dicom_handle = reader.Execute()
-                        identity_direction = tuple(np.identity(len(dicom_handle.GetSize())).flatten())
-                        dicom_handle.SetDirection(identity_direction)
+                        dicom_handle = self.dicom_to_sitk(self.dicom_dict[series_id]['dicom_filenames'])
                         sitk.WriteImage(dicom_handle, output_filename)
                     else:
+                        # not sure if that is multithread safe either
                         dicom_handle = sitk.ReadImage(output_filename)
 
                     if self.dicom_dict[series_id].get('RTDOSE'):

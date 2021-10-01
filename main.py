@@ -2,11 +2,11 @@ from Dicom_Reporter_Class import Dicom_Reporter
 
 
 def main():
-    # input_dir = r'Z:\Morfeus\Bastien\DICOM\EBRT_database_phase_2'
-    # output_dir = r'Z:\Morfeus\Bastien\MERIT\nifti_TEST'
+    input_dir = r'Z:\Morfeus\Bastien\DICOM\EBRT_database_phase_2'
+    output_dir = r'Z:\Morfeus\Bastien\MERIT\nifti_TEST'
 
-    input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
-    output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_consolidated'
+    # input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
+    # output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_consolidated'
     supp_tags = {}
     contour_names = []
     contour_association = {}
