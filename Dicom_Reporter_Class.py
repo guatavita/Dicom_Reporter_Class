@@ -493,7 +493,7 @@ class Dicom_Reporter(object):
                         mask_handle.SetSpacing(ref_spacing)
                         sitk.WriteImage(mask_handle, output_filename)
             except:
-                print('Failed to match rtstruct {}'.format(rtstruct_series_id))
+                print('Failed to match rtstruct {} out {}'.format(rtstruct_series_id, output_dir))
 
     def dicom_writer_worker(self, A):
         q = A[0]
