@@ -470,7 +470,11 @@ class Dicom_Reporter(object):
                     if self.contour_association.get(roi_name):
                         roi_name = self.contour_association.get(roi_name)
 
-                    output_filename = os.path.join(output_dir, '{}.nii.gz'.format(sanitize_filepath(roi_name)))
+                    if roi_contour.ContourSequence[0].ContourGeometricType.lower() == 'point':
+                        output_filename = os.path.join(output_dir, 'point_{}.nii.gz'.format(sanitize_filepath(roi_name)))
+                    else:
+                        output_filename = os.path.join(output_dir, '{}.nii.gz'.format(sanitize_filepath(roi_name)))
+
                     if self.force_rewrite or not os.path.exists(output_filename):
                         mask = np.zeros(ref_size[::-1], dtype=np.int8)
                         for contour_sequence in roi_contour.ContourSequence:
@@ -478,14 +482,11 @@ class Dicom_Reporter(object):
                                         range(0, len(contour_sequence.ContourData), 3)]
                             # pts_array = (np.array(pts_list) - ref_origin) / ref_spacing
                             pts_array = np.array([dicom_handle.TransformPhysicalPointToIndex(i) for i in np.array(pts_list)])
-                            slice_mask = cv2.fillPoly(np.zeros(ref_size[:2]), pts=[pts_array[:, :2].astype(np.int32)],
-                                                      color=(255, 255, 255))
+                            slice_mask = cv2.fillPoly(np.zeros(ref_size[:2]), [pts_array[:, :2].astype(np.int32)], 1)
                             slice_id = int(pts_array[0, 2])
-                            if np.any(mask[slice_id, :, :][slice_mask > 0]) == 1:
-                                mask[slice_id, :, :][slice_mask > 0] = 0
-                            else:
-                                mask[slice_id, :, :][slice_mask > 0] = 1
+                            mask[slice_id, :, :][slice_mask > 0] += 1
 
+                        mask = mask % 2
                         mask_handle = sitk.GetImageFromArray(mask)
                         mask_handle.SetDirection(dicom_handle.GetDirection())
                         mask_handle.SetOrigin(ref_origin)
