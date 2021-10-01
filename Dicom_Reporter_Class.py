@@ -388,7 +388,7 @@ class Dicom_Reporter(object):
                 # store the raw image data
                 ArrayDicom[lstFilesDCM.index(filenameDCM), ...] = ds.pixel_array
         else:
-            ArrayDicom = RefDs.pixel_array
+            ArrayDicom[:, ...] = RefDs.pixel_array
 
         if RefDs.get('SliceThickness'):
             slice_thickness = RefDs.get('SliceThickness')
