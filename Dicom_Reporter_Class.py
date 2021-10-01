@@ -503,28 +503,28 @@ class Dicom_Reporter(object):
                 break
             else:
                 series_id, output_dir = item
-                # try:
-                if self.image_series_id:
-                    output_filename = os.path.join(output_dir, 'image_series_{}.nii.gz'.format(series_id))
-                else:
-                    output_filename = os.path.join(output_dir, 'image.nii.gz')
+                try:
+                    if self.image_series_id:
+                        output_filename = os.path.join(output_dir, 'image_series_{}.nii.gz'.format(series_id))
+                    else:
+                        output_filename = os.path.join(output_dir, 'image.nii.gz')
 
-                if self.force_rewrite or not os.path.exists(output_filename):
-                    dicom_handle = self.dicom_to_sitk(self.dicom_dict[series_id]['dicom_filenames'])
-                    sitk.WriteImage(dicom_handle, output_filename)
-                else:
-                    # not sure if that is multithread safe either
-                    dicom_handle = sitk.ReadImage(output_filename)
+                    if self.force_rewrite or not os.path.exists(output_filename):
+                        dicom_handle = self.dicom_to_sitk(self.dicom_dict[series_id]['dicom_filenames'])
+                        sitk.WriteImage(dicom_handle, output_filename)
+                    else:
+                        # not sure if that is multithread safe either
+                        dicom_handle = sitk.ReadImage(output_filename)
 
-                if self.dicom_dict[series_id].get('RTDOSE'):
-                    self.rtdose_writer(output_dir=output_dir, rtdose_series=self.dicom_dict[series_id]['RTDOSE'],
-                                       dicom_handle=dicom_handle)
+                    if self.dicom_dict[series_id].get('RTDOSE'):
+                        self.rtdose_writer(output_dir=output_dir, rtdose_series=self.dicom_dict[series_id]['RTDOSE'],
+                                           dicom_handle=dicom_handle)
 
-                if self.dicom_dict[series_id].get('RTSTRUCT'):
-                    self.rtstruct_writer(output_dir=output_dir, dicom_handle=dicom_handle,
-                                         rtstruct_series=self.dicom_dict[series_id]['RTSTRUCT'])
-                # except:
-                #     print('Failed on {} {}'.format(series_id, output_dir))
+                    if self.dicom_dict[series_id].get('RTSTRUCT'):
+                        self.rtstruct_writer(output_dir=output_dir, dicom_handle=dicom_handle,
+                                             rtstruct_series=self.dicom_dict[series_id]['RTSTRUCT'])
+                except:
+                    print('Failed on {} {}'.format(series_id, output_dir))
                 q.task_done()
 
     def run_conversion(self):
