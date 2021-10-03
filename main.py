@@ -2,22 +2,25 @@ from Dicom_Reporter_Class import Dicom_Reporter
 
 
 def main():
-    # input_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_TEST'
-    # output_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_TEST\nifti'
+    input_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_TEST'
+    output_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_TEST\nifti'
+
     # input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_TEST'
     # output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti'
 
-    input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
-    output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_consolidated'
+    # input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
+    # output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_consolidated'
     supp_tags = {}
     contour_names = []
     contour_association = {}
     rt_template = {'image_series_id': False,
                    'study_desc_name': True,
-                   'merge_study_serie_desc': True}
+                   'merge_study_serie_desc': True,
+                   'force_uint16': False}
     mg_template = {'image_series_id': True,
                    'study_desc_name': False,
-                   'merge_study_serie_desc': False}
+                   'merge_study_serie_desc': False,
+                   'force_uint16': True}
 
     dicom_explorer = Dicom_Reporter(input_dir=input_dir,
                                     output_dir=output_dir,
@@ -26,7 +29,7 @@ def main():
                                     force_rewrite=True,
                                     save_json=True,
                                     load_json=True,
-                                    supp_tags=supp_tags, nb_threads=60,
+                                    supp_tags=supp_tags, nb_threads=1,
                                     verbose=True, **mg_template)
     dicom_explorer.run_conversion()
 

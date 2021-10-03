@@ -190,14 +190,15 @@ def dicom_reader_worker(A):
 
 class Dicom_Reporter(object):
     def __init__(self, input_dir, output_dir=None, contour_names=[], contour_association={}, force_rewrite=False,
-                 image_series_id=False, study_desc_name=True, merge_study_serie_desc=True, save_json=True,
-                 load_json=True, supp_tags={}, nb_threads=int(0.5 * cpu_count()), verbose=False):
+                 force_uint16 = False, image_series_id=False, study_desc_name=True, merge_study_serie_desc=True,
+                 save_json=True, load_json=True, supp_tags={}, nb_threads=int(0.5 * cpu_count()), verbose=False):
         '''
         :param input_dir: input folder where (unorganized) dicom can be found
         :param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\StudyDate\StudyORSeriesDescription
         :param contour_names: list of contour names that will be written, ALL if empty
         :param contour_association: dictionary of contour names association
         :param force_rewrite: for rewrite of NIfTI images (user should remove dcm_report.json)
+        :param force_uint16: force_uint16 output pixel value representation
         :param image_series_id: True if you want the series id in the image filename, if you expect multiple series in study output dir
         :param study_desc_folder_name: True if you want the output folder to be named after the StudyDescription (False -> SeriesDescription)
         :param merge_study_serie_desc: merge study and series descript for image folder name
@@ -219,6 +220,7 @@ class Dicom_Reporter(object):
         self.contour_names = contour_names
         self.contour_association = contour_association
         self.force_rewrite = force_rewrite
+        self.force_uint16 = force_uint16
         self.set_tags(supp_tags)
         self.nb_threads = min(nb_threads, int(0.9 * cpu_count()))
         self.image_series_id = image_series_id
@@ -395,6 +397,10 @@ class Dicom_Reporter(object):
         else:
             slice_thickness = 1
         ArrayDicom = pydicom.pixel_data_handlers.apply_rescale(ArrayDicom, RefDs)
+
+        if self.force_uint16:
+            ArrayDicom = ArrayDicom.astype(np.uint16)
+
         # maybe use RefDs.ImageOrientationPatient
         identity_direction = tuple(np.identity(len(ConstPixelDims)).flatten())
         if RefDs.get('PixelSpacing'):
