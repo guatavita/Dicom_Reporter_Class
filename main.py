@@ -9,7 +9,7 @@ def main():
     # output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti'
 
     input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
-    output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_consolidated'
+    output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_conso'
     supp_tags = {}
     contour_names = []
     contour_association = {}
