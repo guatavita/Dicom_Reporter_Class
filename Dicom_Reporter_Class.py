@@ -11,6 +11,7 @@ import SimpleITK as sitk
 import pydicom
 import cv2
 from tqdm import tqdm
+from PlotScrollNumpyArrays.Plot_Scroll_Images import plot_scroll_Image
 
 tags = {
     'SOPClassUID': '0008|0016',
@@ -396,10 +397,24 @@ class Dicom_Reporter(object):
             slice_thickness = RefDs.get('SliceThickness')
         else:
             slice_thickness = 1
+
         ArrayDicom = pydicom.pixel_data_handlers.apply_rescale(ArrayDicom, RefDs)
+
+        if RefDs.PhotometricInterpretation == "MONOCHROME1":
+            ArrayDicom = np.amax(ArrayDicom) - ArrayDicom
 
         if self.force_uint16:
             ArrayDicom = ArrayDicom.astype(np.uint16)
+
+        # if RefDs.get('PresentationLUTShape') and RefDs.get('PresentationLUTShape').lower() == 'inverse':
+        #     ArrayDicom = pydicom.pixel_data_handlers.apply_modality_lut(ArrayDicom, RefDs)
+        #     ArrayDicom = pydicom.pixel_data_handlers.apply_voi_lut(ArrayDicom, RefDs)
+        #     # ArrayDicom = np.invert(ArrayDicom)
+        #     # reader = sitk.ImageSeriesReader()
+        #     # reader.MetaDataDictionaryArrayUpdateOn()
+        #     # reader.LoadPrivateTagsOn()
+        #     # reader.SetFileNames([lstFilesDCM[0]])
+        #     # dicom_handle = reader.Execute()
 
         # maybe use RefDs.ImageOrientationPatient
         identity_direction = tuple(np.identity(len(ConstPixelDims)).flatten())

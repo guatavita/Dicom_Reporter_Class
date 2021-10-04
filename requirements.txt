@@ -7,3 +7,4 @@ matplotlib
 ipywidgets
 pathvalidate
 python-gdcm
+PlotScrollNumpyArrays
