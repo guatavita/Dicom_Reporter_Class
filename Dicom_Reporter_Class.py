@@ -406,16 +406,6 @@ class Dicom_Reporter(object):
         if self.force_uint16:
             ArrayDicom = ArrayDicom.astype(np.uint16)
 
-        # if RefDs.get('PresentationLUTShape') and RefDs.get('PresentationLUTShape').lower() == 'inverse':
-        #     ArrayDicom = pydicom.pixel_data_handlers.apply_modality_lut(ArrayDicom, RefDs)
-        #     ArrayDicom = pydicom.pixel_data_handlers.apply_voi_lut(ArrayDicom, RefDs)
-        #     # ArrayDicom = np.invert(ArrayDicom)
-        #     # reader = sitk.ImageSeriesReader()
-        #     # reader.MetaDataDictionaryArrayUpdateOn()
-        #     # reader.LoadPrivateTagsOn()
-        #     # reader.SetFileNames([lstFilesDCM[0]])
-        #     # dicom_handle = reader.Execute()
-
         # maybe use RefDs.ImageOrientationPatient
         identity_direction = tuple(np.identity(len(ConstPixelDims)).flatten())
         if RefDs.get('PixelSpacing'):
