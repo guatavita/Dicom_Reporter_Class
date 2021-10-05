@@ -491,7 +491,7 @@ class Dicom_Reporter(object):
                                                        'point_{}{}'.format(sanitize_filepath(roi_name), self.extension))
                     else:
                         output_filename = os.path.join(output_dir,
-                                                       '{}'.format(sanitize_filepath(roi_name), self.extension))
+                                                       '{}{}'.format(sanitize_filepath(roi_name), self.extension))
 
                     if self.force_rewrite or not os.path.exists(output_filename):
                         mask = np.zeros(ref_size[::-1], dtype=np.int8)
