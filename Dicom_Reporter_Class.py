@@ -191,7 +191,7 @@ def dicom_reader_worker(A):
 
 class Dicom_Reporter(object):
     def __init__(self, input_dir, output_dir=None, contour_names=[], contour_association={}, force_rewrite=False,
-                 extension='.nii.gz', force_uint16=False, image_series_id=False, study_desc_name=True,
+                 extension='.nii.gz', force_uint16=False, force_int16=False, image_series_id=False, study_desc_name=True,
                  merge_study_serie_desc=True, save_json=True, load_json=True, supp_tags={},
                  nb_threads=int(0.5 * cpu_count()), verbose=False):
         '''
@@ -202,6 +202,7 @@ class Dicom_Reporter(object):
         :param force_rewrite: for rewrite of NIfTI images (user should remove dcm_report.json)
         :param extension: output image extension ['.nii.gz', '.nii', '.mhd', '.nrrd', '.mha']
         :param force_uint16: force_uint16 output pixel value representation
+        :param force_int16: force_int16 output pixel value representation
         :param image_series_id: True if you want the series id in the image filename, if you expect multiple series in study output dir
         :param study_desc_folder_name: True if you want the output folder to be named after the StudyDescription (False -> SeriesDescription)
         :param merge_study_serie_desc: merge study and series descript for image folder name
@@ -225,6 +226,7 @@ class Dicom_Reporter(object):
         self.force_rewrite = force_rewrite
         self.extension = extension
         self.force_uint16 = force_uint16
+        self.force_int16 = force_int16
         self.set_tags(supp_tags)
         self.nb_threads = min(nb_threads, int(0.9 * cpu_count()))
         self.image_series_id = image_series_id
@@ -408,6 +410,9 @@ class Dicom_Reporter(object):
             ArrayDicom = np.amax(ArrayDicom) - ArrayDicom
 
         if self.force_uint16:
+            ArrayDicom = ArrayDicom.astype(np.uint16)
+
+        if self.force_int16:
             ArrayDicom = ArrayDicom.astype(np.uint16)
 
         if RefDs.get('PixelSpacing'):
