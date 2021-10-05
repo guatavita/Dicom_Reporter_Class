@@ -390,14 +390,14 @@ class Dicom_Reporter(object):
         else:
             ArrayDicom[:, ...] = RefDs.pixel_array
 
+        z_spacing = 1.0
+
         if len(lstFilesDCM) > 1:
             SdDs = pydicom.read_file(lstFilesDCM[1])
             if RefDs.get('SliceLocation') and SdDs.get('SliceLocation'):
                 z_spacing = abs(RefDs.get('SliceLocation')-SdDs.get('SliceLocation'))
         elif RefDs.get('SliceThickness'):
             z_spacing = RefDs.get('SliceThickness')
-        else:
-            z_spacing = 1.0
 
         ArrayDicom = pydicom.pixel_data_handlers.apply_rescale(ArrayDicom, RefDs)
 
