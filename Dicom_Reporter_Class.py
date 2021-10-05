@@ -372,15 +372,12 @@ class Dicom_Reporter(object):
                 print("Nb RTSTRUCT files to process: {}".format(nb_rtstruct))
 
     def dicom_to_sitk(self, lstFilesDCM):
-        # Get ref file
         RefDs = pydicom.read_file(lstFilesDCM[0])
         if RefDs.get('NumberOfFrames'):
-            # Load dimensions based on the number of rows, columns, and slices (along the Z axis)
             ConstPixelDims = (int(RefDs.NumberOfFrames), int(RefDs.Rows), int(RefDs.Columns))
         else:
-            # Load dimensions based on the number of rows, columns, and slices (along the Z axis)
             ConstPixelDims = (len(lstFilesDCM), int(RefDs.Rows), int(RefDs.Columns))
-        # The array is sized based on 'ConstPixelDims'
+
         ArrayDicom = np.zeros(ConstPixelDims, dtype=RefDs.pixel_array.dtype)
 
         if len(lstFilesDCM) > 1:
@@ -393,10 +390,14 @@ class Dicom_Reporter(object):
         else:
             ArrayDicom[:, ...] = RefDs.pixel_array
 
-        if RefDs.get('SliceThickness'):
-            slice_thickness = RefDs.get('SliceThickness')
+        if len(lstFilesDCM) > 1:
+            SdDs = pydicom.read_file(lstFilesDCM[1])
+            if RefDs.get('SliceLocation') and SdDs.get('SliceLocation'):
+                z_spacing = abs(RefDs.get('SliceLocation')-SdDs.get('SliceLocation'))
+        elif RefDs.get('SliceThickness'):
+            z_spacing = RefDs.get('SliceThickness')
         else:
-            slice_thickness = 1
+            z_spacing = 1.0
 
         ArrayDicom = pydicom.pixel_data_handlers.apply_rescale(ArrayDicom, RefDs)
 
@@ -406,12 +407,13 @@ class Dicom_Reporter(object):
         if self.force_uint16:
             ArrayDicom = ArrayDicom.astype(np.uint16)
 
+        if RefDs.get('PixelSpacing'):
+            spacing = tuple(np.array(RefDs.PixelSpacing, dtype=np.float)) + (np.float(z_spacing),)
+        else:
+            spacing = (1.0, 1.0,) + (np.float(z_spacing),)
+
         # maybe use RefDs.ImageOrientationPatient
         identity_direction = tuple(np.identity(len(ConstPixelDims)).flatten())
-        if RefDs.get('PixelSpacing'):
-            spacing = tuple(np.array(RefDs.PixelSpacing, dtype=np.float)) + (np.float(slice_thickness),)
-        else:
-            spacing = (1.0, 1.0,) + (np.float(slice_thickness),)
 
         if RefDs.get('ImagePositionPatient'):
             origin = tuple(np.array(RefDs.ImagePositionPatient, dtype=np.float))
