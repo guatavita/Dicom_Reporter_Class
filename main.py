@@ -2,11 +2,11 @@ from Dicom_Reporter_Class import Dicom_Reporter
 
 
 def main():
-    # input_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_TEST'
-    # output_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_TEST\nifti'
+    input_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_TEST'
+    output_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_TEST\nifti'
 
-    # input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_TEST'
-    # output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti'
+    input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_TEST'
+    output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti'
 
     input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
     output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_consolidated'

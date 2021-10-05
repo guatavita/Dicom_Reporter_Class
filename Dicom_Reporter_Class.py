@@ -191,14 +191,16 @@ def dicom_reader_worker(A):
 
 class Dicom_Reporter(object):
     def __init__(self, input_dir, output_dir=None, contour_names=[], contour_association={}, force_rewrite=False,
-                 force_uint16 = False, image_series_id=False, study_desc_name=True, merge_study_serie_desc=True,
-                 save_json=True, load_json=True, supp_tags={}, nb_threads=int(0.5 * cpu_count()), verbose=False):
+                 extension='.nii.gz', force_uint16=False, image_series_id=False, study_desc_name=True,
+                 merge_study_serie_desc=True, save_json=True, load_json=True, supp_tags={},
+                 nb_threads=int(0.5 * cpu_count()), verbose=False):
         '''
         :param input_dir: input folder where (unorganized) dicom can be found
         :param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\StudyDate\StudyORSeriesDescription
         :param contour_names: list of contour names that will be written, ALL if empty
         :param contour_association: dictionary of contour names association
         :param force_rewrite: for rewrite of NIfTI images (user should remove dcm_report.json)
+        :param extension: output image extension ['.nii.gz', '.nii', '.mhd', '.nrrd', '.mha']
         :param force_uint16: force_uint16 output pixel value representation
         :param image_series_id: True if you want the series id in the image filename, if you expect multiple series in study output dir
         :param study_desc_folder_name: True if you want the output folder to be named after the StudyDescription (False -> SeriesDescription)
@@ -221,6 +223,7 @@ class Dicom_Reporter(object):
         self.contour_names = contour_names
         self.contour_association = contour_association
         self.force_rewrite = force_rewrite
+        self.extension = extension
         self.force_uint16 = force_uint16
         self.set_tags(supp_tags)
         self.nb_threads = min(nb_threads, int(0.9 * cpu_count()))
@@ -395,7 +398,7 @@ class Dicom_Reporter(object):
         if len(lstFilesDCM) > 1:
             SdDs = pydicom.read_file(lstFilesDCM[1])
             if RefDs.get('SliceLocation') and SdDs.get('SliceLocation'):
-                z_spacing = abs(RefDs.get('SliceLocation')-SdDs.get('SliceLocation'))
+                z_spacing = abs(RefDs.get('SliceLocation') - SdDs.get('SliceLocation'))
         elif RefDs.get('SliceThickness'):
             z_spacing = RefDs.get('SliceThickness')
 
@@ -450,8 +453,8 @@ class Dicom_Reporter(object):
                     dose_handle.SetSpacing(spacing[:3])
                     if dicom_handle:
                         dose_handle = sitk.Resample(dose_handle, dicom_handle)
-                    output_filename = os.path.join(output_dir, 'dose_{}_{}_{}.nii.gz'.format(i, self.rd_dict[
-                        rtdose_series_id]['DoseSummationType'], c))
+                    output_filename = os.path.join(output_dir, 'dose_{}_{}_{}{}'.format(i, self.rd_dict[
+                        rtdose_series_id]['DoseSummationType'], c, self.extension))
                     if self.force_rewrite or not os.path.exists(output_filename):
                         sitk.WriteImage(dose_handle, output_filename)
             else:
@@ -460,8 +463,8 @@ class Dicom_Reporter(object):
                 dose_handle.SetSpacing(spacing[:3])
                 if dicom_handle:
                     dose_handle = sitk.Resample(dose_handle, dicom_handle)
-                output_filename = os.path.join(output_dir, 'dose_{}_{}.nii.gz'.format(i, self.rd_dict[
-                    rtdose_series_id]['DoseSummationType']))
+                output_filename = os.path.join(output_dir, 'dose_{}_{}{}'.format(i, self.rd_dict[
+                    rtdose_series_id]['DoseSummationType'], self.extension))
                 if self.force_rewrite or not os.path.exists(output_filename):
                     sitk.WriteImage(dose_handle, output_filename)
             i += 1
@@ -484,9 +487,11 @@ class Dicom_Reporter(object):
                         roi_name = self.contour_association.get(roi_name)
 
                     if roi_contour.ContourSequence[0].ContourGeometricType.lower() == 'point':
-                        output_filename = os.path.join(output_dir, 'point_{}.nii.gz'.format(sanitize_filepath(roi_name)))
+                        output_filename = os.path.join(output_dir,
+                                                       'point_{}{}'.format(sanitize_filepath(roi_name), self.extension))
                     else:
-                        output_filename = os.path.join(output_dir, '{}.nii.gz'.format(sanitize_filepath(roi_name)))
+                        output_filename = os.path.join(output_dir,
+                                                       '{}'.format(sanitize_filepath(roi_name), self.extension))
 
                     if self.force_rewrite or not os.path.exists(output_filename):
                         mask = np.zeros(ref_size[::-1], dtype=np.int8)
@@ -494,7 +499,8 @@ class Dicom_Reporter(object):
                             pts_list = [contour_sequence.ContourData[i:i + 3] for i in
                                         range(0, len(contour_sequence.ContourData), 3)]
                             # pts_array = (np.array(pts_list) - ref_origin) / ref_spacing
-                            pts_array = np.array([dicom_handle.TransformPhysicalPointToIndex(i) for i in np.array(pts_list)])
+                            pts_array = np.array(
+                                [dicom_handle.TransformPhysicalPointToIndex(i) for i in np.array(pts_list)])
                             slice_mask = cv2.fillPoly(np.zeros(ref_size[:2]), [pts_array[:, :2].astype(np.int32)], 1)
                             slice_id = int(pts_array[0, 2])
                             mask[slice_id, :, :][slice_mask > 0] += 1
@@ -518,9 +524,10 @@ class Dicom_Reporter(object):
                 series_id, output_dir = item
                 try:
                     if self.image_series_id:
-                        output_filename = os.path.join(output_dir, 'image_series_{}.nii.gz'.format(series_id))
+                        output_filename = os.path.join(output_dir,
+                                                       'image_series_{}{}'.format(series_id, self.extension))
                     else:
-                        output_filename = os.path.join(output_dir, 'image.nii.gz')
+                        output_filename = os.path.join(output_dir, 'image{}'.format(self.extension))
 
                     if self.force_rewrite or not os.path.exists(output_filename):
                         dicom_handle = self.dicom_to_sitk(self.dicom_dict[series_id]['dicom_filenames'])
