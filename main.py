@@ -13,14 +13,19 @@ def main():
     supp_tags = {}
     contour_names = []
     contour_association = {}
-    rt_template = {'image_series_id': False,
-                   'study_desc_name': True,
-                   'merge_study_serie_desc': True,
-                   'force_uint16': False}
-    mg_template = {'image_series_id': True,
-                   'study_desc_name': False,
-                   'merge_study_serie_desc': False,
-                   'force_uint16': True}
+    rt_template = {
+        'image_series_id': False,
+        'study_desc_name': True,
+        'merge_study_serie_desc': True,
+        'force_uint16': False,
+        'force_int16': True}
+    mg_template = {
+        'image_series_id': True,
+        'study_desc_name': False,
+        'merge_study_serie_desc': False,
+        'force_uint16': True,
+        'force_int16': False,
+    }
 
     dicom_explorer = Dicom_Reporter(input_dir=input_dir,
                                     output_dir=output_dir,

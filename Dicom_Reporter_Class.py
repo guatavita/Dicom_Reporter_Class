@@ -413,7 +413,7 @@ class Dicom_Reporter(object):
             ArrayDicom = ArrayDicom.astype(np.uint16)
 
         if self.force_int16:
-            ArrayDicom = ArrayDicom.astype(np.uint16)
+            ArrayDicom = ArrayDicom.astype(np.int16)
 
         if RefDs.get('PixelSpacing'):
             spacing = tuple(np.array(RefDs.PixelSpacing, dtype=np.float)) + (np.float(z_spacing),)
