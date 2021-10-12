@@ -93,6 +93,8 @@ def get_unique_series_ids_filenames(dicom_folder):
 
         if ds.get('SliceLocation'):
             slice_loc = float(ds.get('SliceLocation'))
+        elif ds.get('InstanceNumber'):
+            slice_loc = float(ds.get('InstanceNumber'))
         else:
             slice_loc = 0
         series_id_filenames[series_id].append([slice_loc, filename])
@@ -328,7 +330,7 @@ class Dicom_Reporter(object):
             time_start = time.time()
             print("\nLooking for DICOM:")
         for root, dirs, files in os.walk(self.input_dir, topdown=False):
-            if glob.glob(os.path.join(root, '*.dcm')):
+            if glob.glob(os.path.join(root, '*.dcm')) and 'tomo' in root.lower():
                 self.folders_with_dcm.append(root)
 
         if self.verbose:
