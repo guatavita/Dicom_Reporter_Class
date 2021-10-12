@@ -330,7 +330,7 @@ class Dicom_Reporter(object):
             time_start = time.time()
             print("\nLooking for DICOM:")
         for root, dirs, files in os.walk(self.input_dir, topdown=False):
-            if glob.glob(os.path.join(root, '*.dcm')) and 'tomo' in root.lower():
+            if glob.glob(os.path.join(root, '*.dcm')) and 'tomos' in root.lower():
                 self.folders_with_dcm.append(root)
 
         if self.verbose:
