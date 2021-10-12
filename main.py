@@ -2,14 +2,14 @@ from Dicom_Reporter_Class import Dicom_Reporter
 
 
 def main():
-    input_dir = r'Z:\Morfeus\Bastien\MERIT\test_tom'
-    output_dir = r'Z:\Morfeus\Bastien\MERIT\test_tom\nifti'
+    # input_dir = r'Z:\Morfeus\Bastien\MERIT\test_tom'
+    # output_dir = r'Z:\Morfeus\Bastien\MERIT\test_tom\nifti'
 
     # input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_TEST'
     # output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti'
     #
-    # input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
-    # output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_consolidated'
+    input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
+    output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_consolidated'
     supp_tags = {}
     contour_names = []
     contour_association = {}
