@@ -5,12 +5,28 @@ def main():
     # input_dir = r'Z:\Morfeus\Bastien\MERIT\test_tom'
     # output_dir = r'Z:\Morfeus\Bastien\MERIT\test_tom\nifti'
 
-    # input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_TEST'
-    # output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti'
-    #
-    input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
-    output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_consolidated'
-    supp_tags = {}
+    input_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_test'
+    output_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_test\nifti'
+
+    # input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
+    # output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_consolidated'
+    supp_tags = {
+        'Manufacturer': '0008|0070',
+        'KVP': '0018|0060',
+        'ExposureTime': '0018|9328',
+        'ExposureTimeInms': '0018|1150',
+        'XRayTubeCurrent': '0018|1151',
+        'XRayTubeCurrentInmA': '0018|9330',
+        'Exposure': '0018|1152',
+        'ExposureInmAs': '0018|9332',
+        'BodyPartThickness': '0018|11a0',
+        'CompressionForce': '0018|11a2',
+        'RelativeXRayExposure': '0018|1405',
+        'Rows': '0028|0010',
+        'Columns': '0028|0011',
+        'PixelSpacing': '0028|0030',
+        'OrganDose': '0040|0316',
+    }
     contour_names = []
     contour_association = {}
     rt_template = {
@@ -34,7 +50,7 @@ def main():
                                     force_rewrite=True,
                                     save_json=True,
                                     load_json=True,
-                                    supp_tags=supp_tags, nb_threads=70,
+                                    supp_tags=supp_tags, nb_threads=1,
                                     verbose=True, **mg_template)
     dicom_explorer.run_conversion()
 

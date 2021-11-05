@@ -49,7 +49,6 @@ def splitext_(path):
 
 
 def AddDicomSeriesToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
-    # TODO read partial pydicom with ds = pydicom.dcmread(filename, stop_before_pixels=True)?
     series_ids_dict = get_unique_series_ids_filenames(dicom_folder)
     for series_id in list(series_ids_dict.keys()):
         if series_id not in dicom_dict and series_id not in rd_dict:
@@ -124,6 +123,25 @@ def return_sitk_series_ids(reader, input_folder, get_filenames=False):
         return series_ids_list
 
 
+def recurse(ds):
+    # add extra tag that could be found only in sequences for some modalities
+    # seq_elems = [elem for elem in ds if elem.VR == 'SQ']
+    elem_list = []
+    for key in list(ds.keys()):
+        try:
+            # have to do that to avoid "unable to convert value to int without loss" with ds.iterall()
+            # previous version: {k.keyword:k.value for k in ds.iterall()}
+            elem = ds.get(key)
+        except:
+            continue
+
+        if elem.VR == 'SQ':
+            elem_list += sum([recurse(item) for item in elem.value], [])
+        else:
+            elem_list += [elem]
+    return elem_list
+
+
 def dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, rt_dict, tags_dict):
     '''
     :param series_id:
@@ -140,11 +158,15 @@ def dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, rt_dict,
     series_dict = {}
     series_dict['dicom_filenames'] = dicom_filenames
     modality = ds.get('Modality')
+    ds_all = {k.keyword:k.value for k in recurse(ds)}
     for tag_name in list(tags_dict.keys()):
         if tag_name == 'PatientName':
             series_dict[tag_name] = str(ds.get(tag_name))
         else:
             series_dict[tag_name] = ds.get(tag_name)
+
+        if not series_dict[tag_name]:
+            series_dict[tag_name] = ds_all.get(tag_name)
 
     if modality.lower() == 'rtdose':
         if series_id not in rd_dict:
@@ -193,7 +215,8 @@ def dicom_reader_worker(A):
 
 class Dicom_Reporter(object):
     def __init__(self, input_dir, output_dir=None, contour_names=[], contour_association={}, force_rewrite=False,
-                 extension='.nii.gz', force_uint16=False, force_int16=False, image_series_id=False, study_desc_name=True,
+                 extension='.nii.gz', force_uint16=False, force_int16=False, image_series_id=False,
+                 study_desc_name=True,
                  merge_study_serie_desc=True, save_json=True, load_json=True, supp_tags={},
                  nb_threads=int(0.5 * cpu_count()), verbose=False):
         '''
@@ -210,13 +233,10 @@ class Dicom_Reporter(object):
         :param merge_study_serie_desc: merge study and series descript for image folder name
         :param save_json: save dcm_report.json in output_dir
         :param load_json: reload previous dcm_report.json
-        :param supp_tags: extract DICOM metadata for in-house usage
+        :param supp_tags: extract DICOM metadata for in-house usage, format dict such as {'SOPClassUID': '0008|0016',}
         :param nb_threads: nb_thread to run processes in multithreads
         :param verbose: True to have output prints
         '''
-
-        # TODO create dicom_report in excel sheet?
-        # TODO remove series_id in output file name
 
         self.input_dir = input_dir
         self.output_dir = output_dir
@@ -248,6 +268,7 @@ class Dicom_Reporter(object):
         self.walk_main_directory()
         self.dicom_explorer()
         self.create_association()
+        self.convert_types()
         self.save_dcm_report()
 
     def create_contour_association(self):
@@ -260,7 +281,6 @@ class Dicom_Reporter(object):
                 self.contour_association[contour_name.lower()] = self.contour_association.get(contour_name)
 
     def create_association(self):
-
         if self.verbose:
             time_start = time.time()
             print("\nMerging RTDOSE:")
@@ -298,6 +318,12 @@ class Dicom_Reporter(object):
         if self.verbose:
             print("Elapsed time {}s".format(int(time.time() - time_start)))
 
+    def convert_types(self):
+        for dcm_series_key in list(self.dicom_dict.keys()):
+            for tag in list(self.dicom_dict[dcm_series_key].keys()):
+                if isinstance(self.dicom_dict[dcm_series_key][tag], pydicom.multival.MultiValue):
+                    self.dicom_dict[dcm_series_key][tag] = list(self.dicom_dict[dcm_series_key][tag])
+
     def force_update(self):
         self.walk_main_directory()
         self.dicom_explorer()
@@ -307,14 +333,37 @@ class Dicom_Reporter(object):
         if self.load_json:
             if os.path.exists(self.dcm_report_path):
                 with open(self.dcm_report_path, 'r') as f:
-                    self.dicom_dict = json.load(f)
+                    try:
+                        self.dicom_dict = json.load(f)
+                    except:
+                        print("JSON file could not be loaded")
 
     def save_dcm_report(self):
         if self.save_json and self.output_dir:
             if not os.path.exists(self.output_dir):
                 os.makedirs(self.output_dir)
             with open(self.dcm_report_path, 'w') as f:
-                json.dump(self.dicom_dict, f)
+                try:
+                    json.dump(self.dicom_dict, f)
+                except:
+                    print("JSON file could not be saved")
+
+            # number of keys per element of the dict should be same because we define the header of the txt file
+            keys = list(self.dicom_dict.keys())
+            tags = list(self.dicom_dict[keys[0]].keys())
+            output_txt = open(self.dcm_report_path.replace('.json', '.txt'), 'w')
+            output_txt.write('{}\n'.format(','.join(tags)))
+            for key in keys:
+                for tag in tags:
+                    tag_value = self.dicom_dict[key][tag]
+                    if isinstance(tag_value, str):
+                        tag_value = tag_value.replace(',', '')
+                    if isinstance(tag_value, list):
+                        tag_value = '/'.join(str(x) for x in tag_value)
+                    output_txt.write('{},'.format(tag_value))
+                output_txt.write('\n')
+            output_txt.close()
+            xxx = 1
 
     def set_tags(self, supp_tags):
         try:
@@ -330,7 +379,7 @@ class Dicom_Reporter(object):
             time_start = time.time()
             print("\nLooking for DICOM:")
         for root, dirs, files in os.walk(self.input_dir, topdown=False):
-            if glob.glob(os.path.join(root, '*.dcm')) and 'tomos' in root.lower():
+            if glob.glob(os.path.join(root, '*.dcm')):
                 self.folders_with_dcm.append(root)
 
         if self.verbose:
