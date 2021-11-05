@@ -158,7 +158,7 @@ def dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, rt_dict,
     series_dict = {}
     series_dict['dicom_filenames'] = dicom_filenames
     modality = ds.get('Modality')
-    ds_all = {k.keyword:k.value for k in recurse(ds)}
+    ds_all = {k.keyword: k.value for k in recurse(ds)}
     for tag_name in list(tags_dict.keys()):
         if tag_name == 'PatientName':
             series_dict[tag_name] = str(ds.get(tag_name))
@@ -211,6 +211,64 @@ def dicom_reader_worker(A):
             except:
                 print('Failed on {}'.format(dicom_folder))
         q.task_done()
+
+
+def dicom_to_sitk(lstFilesDCM, force_uint16=False, force_int16=False):
+    RefDs = pydicom.read_file(lstFilesDCM[0])
+    if RefDs.get('NumberOfFrames'):
+        ConstPixelDims = (int(RefDs.NumberOfFrames), int(RefDs.Rows), int(RefDs.Columns))
+    else:
+        ConstPixelDims = (len(lstFilesDCM), int(RefDs.Rows), int(RefDs.Columns))
+
+    ArrayDicom = np.zeros(ConstPixelDims, dtype=RefDs.pixel_array.dtype)
+
+    if len(lstFilesDCM) > 1:
+        # loop through all the DICOM files
+        for filenameDCM in lstFilesDCM:
+            # read the file
+            ds = pydicom.read_file(filenameDCM)
+            # store the raw image data
+            ArrayDicom[lstFilesDCM.index(filenameDCM), ...] = ds.pixel_array
+    else:
+        ArrayDicom[:, ...] = RefDs.pixel_array
+
+    z_spacing = 1.0
+
+    if len(lstFilesDCM) > 1:
+        SdDs = pydicom.read_file(lstFilesDCM[1])
+        if RefDs.get('SliceLocation') and SdDs.get('SliceLocation'):
+            z_spacing = abs(RefDs.get('SliceLocation') - SdDs.get('SliceLocation'))
+    elif RefDs.get('SliceThickness'):
+        z_spacing = RefDs.get('SliceThickness')
+
+    ArrayDicom = pydicom.pixel_data_handlers.apply_rescale(ArrayDicom, RefDs)
+
+    if RefDs.PhotometricInterpretation == "MONOCHROME1":
+        ArrayDicom = np.amax(ArrayDicom) - ArrayDicom
+
+    if force_uint16:
+        ArrayDicom = ArrayDicom.astype(np.uint16)
+
+    if force_int16:
+        ArrayDicom = ArrayDicom.astype(np.int16)
+
+    if RefDs.get('PixelSpacing'):
+        spacing = tuple(np.array(RefDs.PixelSpacing, dtype=np.float)) + (np.float(z_spacing),)
+    else:
+        spacing = (1.0, 1.0,) + (np.float(z_spacing),)
+
+    # maybe use RefDs.ImageOrientationPatient
+    identity_direction = tuple(np.identity(len(ConstPixelDims)).flatten())
+
+    if RefDs.get('ImagePositionPatient'):
+        origin = tuple(np.array(RefDs.ImagePositionPatient, dtype=np.float))
+    else:
+        origin = (0, 0, 0)
+    sitk_pointer = sitk.GetImageFromArray(ArrayDicom)
+    sitk_pointer.SetDirection(identity_direction)
+    sitk_pointer.SetSpacing(spacing)
+    sitk_pointer.SetOrigin(origin)
+    return sitk_pointer
 
 
 class Dicom_Reporter(object):
@@ -427,63 +485,6 @@ class Dicom_Reporter(object):
                     nb_rtstruct += len(self.rt_dict[series_id]['dicom_filenames'])
                 print("Nb RTSTRUCT files to process: {}".format(nb_rtstruct))
 
-    def dicom_to_sitk(self, lstFilesDCM):
-        RefDs = pydicom.read_file(lstFilesDCM[0])
-        if RefDs.get('NumberOfFrames'):
-            ConstPixelDims = (int(RefDs.NumberOfFrames), int(RefDs.Rows), int(RefDs.Columns))
-        else:
-            ConstPixelDims = (len(lstFilesDCM), int(RefDs.Rows), int(RefDs.Columns))
-
-        ArrayDicom = np.zeros(ConstPixelDims, dtype=RefDs.pixel_array.dtype)
-
-        if len(lstFilesDCM) > 1:
-            # loop through all the DICOM files
-            for filenameDCM in lstFilesDCM:
-                # read the file
-                ds = pydicom.read_file(filenameDCM)
-                # store the raw image data
-                ArrayDicom[lstFilesDCM.index(filenameDCM), ...] = ds.pixel_array
-        else:
-            ArrayDicom[:, ...] = RefDs.pixel_array
-
-        z_spacing = 1.0
-
-        if len(lstFilesDCM) > 1:
-            SdDs = pydicom.read_file(lstFilesDCM[1])
-            if RefDs.get('SliceLocation') and SdDs.get('SliceLocation'):
-                z_spacing = abs(RefDs.get('SliceLocation') - SdDs.get('SliceLocation'))
-        elif RefDs.get('SliceThickness'):
-            z_spacing = RefDs.get('SliceThickness')
-
-        ArrayDicom = pydicom.pixel_data_handlers.apply_rescale(ArrayDicom, RefDs)
-
-        if RefDs.PhotometricInterpretation == "MONOCHROME1":
-            ArrayDicom = np.amax(ArrayDicom) - ArrayDicom
-
-        if self.force_uint16:
-            ArrayDicom = ArrayDicom.astype(np.uint16)
-
-        if self.force_int16:
-            ArrayDicom = ArrayDicom.astype(np.int16)
-
-        if RefDs.get('PixelSpacing'):
-            spacing = tuple(np.array(RefDs.PixelSpacing, dtype=np.float)) + (np.float(z_spacing),)
-        else:
-            spacing = (1.0, 1.0,) + (np.float(z_spacing),)
-
-        # maybe use RefDs.ImageOrientationPatient
-        identity_direction = tuple(np.identity(len(ConstPixelDims)).flatten())
-
-        if RefDs.get('ImagePositionPatient'):
-            origin = tuple(np.array(RefDs.ImagePositionPatient, dtype=np.float))
-        else:
-            origin = (0, 0, 0)
-        sitk_pointer = sitk.GetImageFromArray(ArrayDicom)
-        sitk_pointer.SetDirection(identity_direction)
-        sitk_pointer.SetSpacing(spacing)
-        sitk_pointer.SetOrigin(origin)
-        return sitk_pointer
-
     def rtdose_writer(self, output_dir, rtdose_series=[], dicom_handle=None):
         '''
         :param output_dir: output directory
@@ -496,7 +497,8 @@ class Dicom_Reporter(object):
         for rtdose_series_id in rtdose_series:
             if not self.rd_dict.get(rtdose_series_id):
                 continue
-            dose_handle = self.dicom_to_sitk(self.rd_dict[rtdose_series_id]['dicom_filenames'])
+            dose_handle = dicom_to_sitk(self.rd_dict[rtdose_series_id]['dicom_filenames'], force_uint16=False,
+                                        force_int16=False)
             origin = dose_handle.GetOrigin()
             spacing = dose_handle.GetSpacing()
             dose_array = np.squeeze(sitk.GetArrayFromImage(dose_handle).astype(np.float32))
@@ -586,7 +588,8 @@ class Dicom_Reporter(object):
                         output_filename = os.path.join(output_dir, 'image{}'.format(self.extension))
 
                     if self.force_rewrite or not os.path.exists(output_filename):
-                        dicom_handle = self.dicom_to_sitk(self.dicom_dict[series_id]['dicom_filenames'])
+                        dicom_handle = dicom_to_sitk(self.dicom_dict[series_id]['dicom_filenames'],
+                                                     force_uint16=self.force_uint16, force_int16=self.force_int16)
                         sitk.WriteImage(dicom_handle, output_filename)
                     else:
                         # not sure if that is multithread safe either

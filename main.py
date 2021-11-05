@@ -5,8 +5,8 @@ def main():
     # input_dir = r'Z:\Morfeus\Bastien\MERIT\test_tom'
     # output_dir = r'Z:\Morfeus\Bastien\MERIT\test_tom\nifti'
 
-    input_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_test'
-    output_dir = r'Z:\Morfeus\Bastien\MERIT\DICOM_test\nifti'
+    input_dir = r'Z:\Morfeus\Bastien\DICOM\AIP_LACC\test'
+    output_dir = r'Z:\Morfeus\Bastien\DICOM\AIP_LACC\test\nifti'
 
     # input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
     # output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_consolidated'
@@ -51,7 +51,7 @@ def main():
                                     save_json=True,
                                     load_json=True,
                                     supp_tags=supp_tags, nb_threads=1,
-                                    verbose=True, **mg_template)
+                                    verbose=True, **rt_template)
     dicom_explorer.run_conversion()
 
 
