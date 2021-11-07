@@ -5,11 +5,11 @@ def main():
     # input_dir = r'Z:\Morfeus\Bastien\MERIT\test_tom'
     # output_dir = r'Z:\Morfeus\Bastien\MERIT\test_tom\nifti'
 
-    input_dir = r'Z:\Morfeus\Bastien\DICOM\AIP_LACC\test'
-    output_dir = r'Z:\Morfeus\Bastien\DICOM\AIP_LACC\test\nifti'
+    # input_dir = r'Z:\Morfeus\Bastien\DICOM\AIP_LACC\test'
+    # output_dir = r'Z:\Morfeus\Bastien\DICOM\AIP_LACC\test\nifti'
 
-    # input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
-    # output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_consolidated'
+    input_dir = r'/workspace/Morfeus/Bastien/MERIT/DICOM_study_v1/Consolidated/DATA'
+    output_dir = r'/workspace/Morfeus/Bastien/MERIT/nifti_consolidated'
     supp_tags = {
         'Manufacturer': '0008|0070',
         'KVP': '0018|0060',
@@ -50,9 +50,9 @@ def main():
                                     force_rewrite=True,
                                     save_json=True,
                                     load_json=True,
-                                    supp_tags=supp_tags, nb_threads=1,
-                                    verbose=True, **rt_template)
-    dicom_explorer.run_conversion()
+                                    supp_tags=supp_tags, nb_threads=40,
+                                    verbose=True, **mg_template)
+    # dicom_explorer.run_conversion()
 
 
 if __name__ == '__main__':
