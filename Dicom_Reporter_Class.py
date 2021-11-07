@@ -421,7 +421,6 @@ class Dicom_Reporter(object):
                     output_txt.write('{},'.format(tag_value))
                 output_txt.write('\n')
             output_txt.close()
-            xxx = 1
 
     def set_tags(self, supp_tags):
         try:
