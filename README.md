@@ -41,7 +41,6 @@ def main():
 
     contour_names = ['Bag_Bowel']
     contour_association = {
-        'CTV45_Pelvis Nodes': 'CTVNs',
         'CTV45_Pelvic Nodes': 'CTVN',
         'CTV45_Pelvis_Nodes': 'CTVN',
         'CTVn45': 'CTVN',
