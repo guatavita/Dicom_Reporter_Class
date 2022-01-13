@@ -21,6 +21,7 @@ tags = {
     'SeriesInstanceUID': '0020|000e',
     'SeriesDescription': '0008|103e',
     'SeriesDate': '0008|0021',
+    'FrameOfReferenceUID':'0020|0052',
     'Modality': '0008|0060',
     'Manufacturer': '0008|0070',
     'InstitutionName': '0008|0080',
@@ -346,13 +347,15 @@ class Dicom_Reporter(object):
         # merging rdstruct to the corresponding study instance uid of the images
         for rd_series_key in list(self.rd_dict.keys()):
             rd_study_instance_uid = self.rd_dict[rd_series_key]['StudyInstanceUID']
-            if not rd_study_instance_uid:
+            rd_frame_reference_uid = self.rd_dict[rd_series_key]['FrameOfReferenceUID']
+            if not rd_study_instance_uid or not rd_frame_reference_uid:
                 continue
             for dcm_series_key in list(self.dicom_dict.keys()):
                 dcm_study_instance_uid = self.dicom_dict[dcm_series_key]['StudyInstanceUID']
-                if not dcm_study_instance_uid:
+                dcm_frame_reference_uid = self.dicom_dict[dcm_series_key]['FrameOfReferenceUID']
+                if not dcm_study_instance_uid or not dcm_frame_reference_uid:
                     continue
-                if dcm_study_instance_uid == rd_study_instance_uid:
+                if dcm_study_instance_uid == rd_study_instance_uid and dcm_frame_reference_uid == rd_frame_reference_uid:
                     if not self.dicom_dict[dcm_series_key].get('RTDOSE'):
                         self.dicom_dict[dcm_series_key]['RTDOSE'] = []
                     if rd_series_key not in self.dicom_dict[dcm_series_key]['RTDOSE']:
@@ -363,13 +366,15 @@ class Dicom_Reporter(object):
         # merging rtstruct to the corresponding study instance uid of the images
         for rt_series_key in list(self.rt_dict.keys()):
             rt_study_instance_uid = self.rt_dict[rt_series_key]['StudyInstanceUID']
-            if not rt_study_instance_uid:
+            rt_frame_reference_uid = self.rt_dict[rt_series_key]['FrameOfReferenceUID']
+            if not rt_study_instance_uid or not rt_frame_reference_uid:
                 continue
             for dcm_series_key in list(self.dicom_dict.keys()):
                 dcm_study_instance_uid = self.dicom_dict[dcm_series_key]['StudyInstanceUID']
-                if not dcm_study_instance_uid:
+                dcm_frame_reference_uid = self.dicom_dict[dcm_series_key]['FrameOfReferenceUID']
+                if not dcm_study_instance_uid or not dcm_frame_reference_uid:
                     continue
-                if dcm_study_instance_uid == rt_study_instance_uid:
+                if dcm_study_instance_uid == rt_study_instance_uid and dcm_frame_reference_uid == rt_frame_reference_uid:
                     if not self.dicom_dict[dcm_series_key].get('RTSTRUCT'):
                         self.dicom_dict[dcm_series_key]['RTSTRUCT'] = []
                     if rt_series_key not in self.dicom_dict[dcm_series_key]['RTSTRUCT']:
