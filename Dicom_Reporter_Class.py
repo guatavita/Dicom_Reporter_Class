@@ -541,6 +541,9 @@ class Dicom_Reporter(object):
                     if self.contour_names and not self.contour_association.get(roi_name):
                         continue
 
+                    if roi_contour.get('ContourSequence') is None:
+                        continue
+
                     if self.contour_association.get(roi_name):
                         roi_name = self.contour_association.get(roi_name)
 
