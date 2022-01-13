@@ -419,7 +419,7 @@ class Dicom_Reporter(object):
             output_txt.write('{}\n'.format(','.join(tags)))
             for key in keys:
                 for tag in tags:
-                    tag_value = self.dicom_dict[key][tag]
+                    tag_value = self.dicom_dict[key].get(tag)
                     if isinstance(tag_value, str):
                         tag_value = tag_value.replace(',', '')
                     if isinstance(tag_value, list):
