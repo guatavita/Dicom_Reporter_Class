@@ -90,9 +90,10 @@ def get_unique_series_ids_filenames(dicom_folder):
         if series_id not in series_id_filenames:
             series_id_filenames[series_id] = []
 
-        if ds.get('SliceLocation'):
+        # force test not None because you can have a SliceLocation == 0.0
+        if ds.get('SliceLocation') is not None:
             slice_loc = float(ds.get('SliceLocation'))
-        elif ds.get('InstanceNumber'):
+        elif ds.get('InstanceNumber') is not None:
             slice_loc = float(ds.get('InstanceNumber'))
         else:
             slice_loc = 0
@@ -236,7 +237,7 @@ def dicom_to_sitk(lstFilesDCM, force_uint16=False, force_int16=False):
 
     if len(lstFilesDCM) > 1:
         SdDs = pydicom.read_file(lstFilesDCM[1])
-        if RefDs.get('SliceLocation') and SdDs.get('SliceLocation'):
+        if RefDs.get('SliceLocation') is not None and SdDs.get('SliceLocation') is not None:
             z_spacing = abs(RefDs.get('SliceLocation') - SdDs.get('SliceLocation'))
     elif RefDs.get('SliceThickness'):
         z_spacing = RefDs.get('SliceThickness')
