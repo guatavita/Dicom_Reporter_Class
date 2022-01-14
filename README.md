@@ -12,7 +12,7 @@ This class support unorganized DICOM data as each study will be matched by their
 
 ```
 :param input_dir: input folder where (unorganized) dicom can be found
-:param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\StudyDate\StudyORSeriesDescription
+:param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\SeriesDate\StudyORSeriesDescription
 :param contour_names: list of contour names that will be written, ALL if empty
 :param contour_association: dictionary of contour names association
 :param force_rewrite: for rewrite of NIfTI images (user should remove dcm_report.json)
@@ -22,6 +22,8 @@ This class support unorganized DICOM data as each study will be matched by their
 :param image_series_id: True if you want the series id in the image filename, if you expect multiple series in study output dir
 :param study_desc_folder_name: True if you want the output folder to be named after the StudyDescription (False -> SeriesDescription)
 :param merge_study_serie_desc: merge study and series descript for image folder name
+:param include_patient_name: include patient name with MRN in output folder name
+:param avoid_duplicate: True if you want to add _N after folder name in case duplicate output foldername
 :param save_json: save dcm_report.json in output_dir
 :param load_json: reload previous dcm_report.json
 :param supp_tags: extract DICOM metadata for in-house usage, format dict such as {'SOPClassUID': '0008|0016',}
