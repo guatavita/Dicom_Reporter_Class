@@ -329,8 +329,9 @@ class Dicom_Reporter(object):
             rt_reference_uid = None
             if self.rt_dict[rt_sop_uid_key]['ReferencedFrameOfReferenceSequence']:
                 rt_reference_uid = \
-                self.rt_dict[rt_sop_uid_key]['ReferencedFrameOfReferenceSequence'][0].get('RTReferencedStudySequence')[
-                    0].get('ReferencedSOPInstanceUID')
+                    self.rt_dict[rt_sop_uid_key]['ReferencedFrameOfReferenceSequence'][0].get(
+                        'RTReferencedStudySequence')[
+                        0].get('ReferencedSOPInstanceUID')
             if None in [rt_study_instance_uid, rt_reference_uid, rt_frame_reference]:
                 continue
             for dcm_series_uid_key in list(self.dicom_dict.keys()):
@@ -597,7 +598,9 @@ class Dicom_Reporter(object):
             print("\nConverting DICOM:")
         for dcm_uid in tqdm(list(self.dicom_dict.keys())):
             if self.include_patient_name:
-                output_path = os.path.join(self.output_dir, "{}_{}".format(self.dicom_dict[dcm_uid]['PatientID'].rstrip(), '^'.join(self.dicom_dict[dcm_uid]['PatientName'].split('^')).title()))
+                output_path = os.path.join(self.output_dir,
+                                           "{}_{}".format(self.dicom_dict[dcm_uid]['PatientID'].rstrip(), '^'.join(
+                                               [x for x in self.dicom_dict[dcm_uid]['PatientName'].split('^') if x]).title()))
             else:
                 output_path = os.path.join(self.output_dir, self.dicom_dict[dcm_uid]['PatientID'].rstrip())
 
@@ -629,7 +632,7 @@ class Dicom_Reporter(object):
             if os.path.exists(output_dir) and self.avoid_duplicate:
                 if self.verbose:
                     print('WARNING: duplicate folder names for {}'.format(output_dir))
-                last_output_dir = dir_list = glob.glob(output_dir+'*')[-1]
+                last_output_dir = dir_list = glob.glob(output_dir + '*')[-1]
                 if last_output_dir[-1].isdigit():
                     output_dir = last_output_dir[:-1] + str(int(last_output_dir[-1]) + 1)
                 else:
