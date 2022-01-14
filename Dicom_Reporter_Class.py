@@ -231,7 +231,7 @@ class Dicom_Reporter(object):
                  nb_threads=int(0.5 * cpu_count()), verbose=False):
         '''
         :param input_dir: input folder where (unorganized) dicom can be found
-        :param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\SeriesDate\StudyORSeriesDescription
+        :param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\Date\StudyORSeriesDescription
         :param contour_names: list of contour names that will be written, ALL if empty
         :param contour_association: dictionary of contour names association
         :param force_rewrite: for rewrite of NIfTI images (user should remove dcm_report.json)
@@ -615,8 +615,14 @@ class Dicom_Reporter(object):
             if self.dicom_dict[dcm_uid]['PresentationIntentType']:
                 description += '_{}'.format(
                     self.dicom_dict[dcm_uid]['PresentationIntentType'].replace(' ', '_'))
+
+            # some dicom can have the same StudyDate as other dicom but not the same SeriesDate
+            output_date = self.dicom_dict[dcm_uid]['StudyDate']
+            if self.dicom_dict[dcm_uid]['SeriesDate'] and self.dicom_dict[dcm_uid]['SeriesDate'] != output_date:
+                output_date = self.dicom_dict[dcm_uid]['SeriesDate']
+
             output_dir = os.path.join(output_path,
-                                      '{}'.format(self.dicom_dict[dcm_uid]['SeriesDate']),
+                                      '{}'.format(output_date),
                                       '{}'.format(description))
 
             # avoid duplicate folder name if no descriptions are available
