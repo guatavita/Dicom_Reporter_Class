@@ -597,7 +597,7 @@ class Dicom_Reporter(object):
             print("\nConverting DICOM:")
         for dcm_uid in tqdm(list(self.dicom_dict.keys())):
             if self.include_patient_name:
-                output_path = os.path.join(self.output_dir, "{}_{}".format(self.dicom_dict[dcm_uid]['PatientID'].rstrip(), self.dicom_dict[dcm_uid]['PatientName']))
+                output_path = os.path.join(self.output_dir, "{}_{}".format(self.dicom_dict[dcm_uid]['PatientID'].rstrip(), self.dicom_dict[dcm_uid]['PatientName'].replace('^^^', '')))
             else:
                 output_path = os.path.join(self.output_dir, self.dicom_dict[dcm_uid]['PatientID'].rstrip())
 
