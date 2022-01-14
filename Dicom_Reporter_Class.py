@@ -597,7 +597,7 @@ class Dicom_Reporter(object):
             print("\nConverting DICOM:")
         for dcm_uid in tqdm(list(self.dicom_dict.keys())):
             if self.include_patient_name:
-                output_path = os.path.join(self.output_dir, "{}_{}".format(self.dicom_dict[dcm_uid]['PatientID'].rstrip(), self.dicom_dict[dcm_uid]['PatientName'].replace('^^^', '')))
+                output_path = os.path.join(self.output_dir, "{}_{}".format(self.dicom_dict[dcm_uid]['PatientID'].rstrip(), '^'.join(self.dicom_dict[dcm_uid]['PatientName'].split('^')).title()))
             else:
                 output_path = os.path.join(self.output_dir, self.dicom_dict[dcm_uid]['PatientID'].rstrip())
 
@@ -627,6 +627,8 @@ class Dicom_Reporter(object):
 
             # avoid duplicate folder name if no descriptions are available
             if os.path.exists(output_dir) and self.avoid_duplicate:
+                if self.verbose:
+                    print('WARNING: duplicate folder names for {}'.format(output_dir))
                 last_output_dir = dir_list = glob.glob(output_dir+'*')[-1]
                 if last_output_dir[-1].isdigit():
                     output_dir = last_output_dir[:-1] + str(int(last_output_dir[-1]) + 1)
