@@ -616,7 +616,7 @@ class Dicom_Reporter(object):
                 description += '_{}'.format(
                     self.dicom_dict[dcm_uid]['PresentationIntentType'].replace(' ', '_'))
             output_dir = os.path.join(output_path,
-                                      '{}'.format(self.dicom_dict[dcm_uid]['StudyDate']),
+                                      '{}'.format(self.dicom_dict[dcm_uid]['SeriesDate']),
                                       '{}'.format(description))
 
             # avoid duplicate folder name if no descriptions are available
