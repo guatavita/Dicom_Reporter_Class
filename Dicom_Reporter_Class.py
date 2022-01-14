@@ -1,4 +1,4 @@
-import os, glob
+import os, glob, copy
 import threading
 import time
 import json
@@ -145,7 +145,7 @@ def dictionary_creator(series_uid, dicom_filenames, dicom_dict, rd_dict, rt_dict
     elif modality.lower() == 'rtstruct':
         if uid_dict['SOPInstanceUID'] not in rt_dict:
             rt_dict[uid_dict['SOPInstanceUID']] = uid_dict
-    else:
+    elif modality.lower() not in ['rtplan']:
         if series_uid not in dicom_dict:
             dicom_dict[series_uid] = uid_dict
 
@@ -190,8 +190,8 @@ def dicom_to_sitk(lstFilesDCM, force_uint16=False, force_int16=False):
         SdDs = pydicom.read_file(lstFilesDCM[1])
         if RefDs.get('SliceLocation') is not None and SdDs.get('SliceLocation') is not None:
             z_spacing = abs(RefDs.get('SliceLocation') - SdDs.get('SliceLocation'))
-    elif RefDs.get('SliceThickness'):
-        z_spacing = RefDs.get('SliceThickness')
+        elif RefDs.get('SliceThickness'):
+            z_spacing = RefDs.get('SliceThickness')
 
     ArrayDicom = pydicom.pixel_data_handlers.apply_rescale(ArrayDicom, RefDs)
 
@@ -226,8 +226,7 @@ def dicom_to_sitk(lstFilesDCM, force_uint16=False, force_int16=False):
 class Dicom_Reporter(object):
     def __init__(self, input_dir, output_dir=None, contour_names=[], contour_association={}, force_rewrite=False,
                  extension='.nii.gz', force_uint16=False, force_int16=False, image_series_id=False,
-                 study_desc_name=True,
-                 merge_study_serie_desc=True, save_json=True, load_json=True, supp_tags={},
+                 study_desc_name=True, merge_study_serie_desc=True, save_json=True, load_json=True, supp_tags={},
                  nb_threads=int(0.5 * cpu_count()), verbose=False):
         '''
         :param input_dir: input folder where (unorganized) dicom can be found
