@@ -568,10 +568,14 @@ class Dicom_Reporter(object):
                 dcm_uid, output_dir = item
                 try:
                     if self.image_series_id:
-                        output_filename = os.path.join(output_dir,
-                                                       'image_series_{}{}'.format(dcm_uid, self.extension))
+                        filename = 'image_series_{}'.format(dcm_uid)
                     else:
-                        output_filename = os.path.join(output_dir, 'image{}'.format(self.extension))
+                        filename = 'image'
+
+                    if self.split_by_cardiac_phase:
+                        filename += '_{}'.format(self.dicom_dict[dcm_uid]['NominalPercentageOfCardiacPhase'])
+
+                    output_filename = os.path.join(output_dir, filename + self.extension)
 
                     if self.force_rewrite or not os.path.exists(output_filename):
                         dicom_handle = dicom_to_sitk(self.dicom_dict[dcm_uid]['dicom_filenames'],
@@ -632,9 +636,6 @@ class Dicom_Reporter(object):
             if self.dicom_dict[dcm_uid]['PresentationIntentType']:
                 description += '_{}'.format(
                     self.dicom_dict[dcm_uid]['PresentationIntentType'].replace(' ', '_'))
-
-            if self.split_by_cardiac_phase:
-                description += '_{}'.format(self.dicom_dict[dcm_uid]['NominalPercentageOfCardiacPhase'])
 
             # some dicom can have the same StudyDate as other dicom but not the same SeriesDate
             output_date = self.dicom_dict[dcm_uid]['StudyDate']
