@@ -226,7 +226,7 @@ def dicom_to_sitk(lstFilesDCM, force_uint16=False, force_int16=False):
 class Dicom_Reporter(object):
     def __init__(self, input_dir, output_dir=None, contour_names=[], contour_association={}, force_rewrite=False,
                  extension='.nii.gz', force_uint16=False, force_int16=False, image_series_id=False,
-                 study_desc_name=True, merge_study_serie_desc=True,
+                 study_desc_name=True, merge_study_serie_desc=True, include_patient_name=False,
                  avoid_duplicate=False, save_json=True, load_json=True, supp_tags={},
                  nb_threads=int(0.5 * cpu_count()), verbose=False):
         '''
@@ -241,6 +241,7 @@ class Dicom_Reporter(object):
         :param image_series_id: True if you want the series id in the image filename, if you expect multiple series in study output dir
         :param study_desc_folder_name: True if you want the output folder to be named after the StudyDescription (False -> SeriesDescription)
         :param merge_study_serie_desc: merge study and series descript for image folder name
+        :param include_patient_name: include patient name with MRN in output folder name
         :param avoid_duplicate: True if you want to add _N after folder name in case duplicate output foldername
         :param save_json: save dcm_report.json in output_dir
         :param load_json: reload previous dcm_report.json
@@ -265,6 +266,7 @@ class Dicom_Reporter(object):
         self.image_series_id = image_series_id
         self.study_desc_name = study_desc_name
         self.merge_study_serie_desc = merge_study_serie_desc
+        self.include_patient_name = include_patient_name
         self.avoid_duplicate = avoid_duplicate
         self.save_json = save_json
         self.load_json = load_json
@@ -594,7 +596,10 @@ class Dicom_Reporter(object):
             time_start = time.time()
             print("\nConverting DICOM:")
         for dcm_uid in tqdm(list(self.dicom_dict.keys())):
-            output_path = os.path.join(self.output_dir, self.dicom_dict[dcm_uid]['PatientID'].rstrip())
+            if self.include_patient_name:
+                output_path = os.path.join(self.output_dir, "{}_{}".format(self.dicom_dict[dcm_uid]['PatientID'].rstrip(), self.dicom_dict[dcm_uid]['PatientName']))
+            else:
+                output_path = os.path.join(self.output_dir, self.dicom_dict[dcm_uid]['PatientID'].rstrip())
 
             if self.merge_study_serie_desc:
                 description = "{}_{}".format(
