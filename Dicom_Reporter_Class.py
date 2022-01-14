@@ -282,7 +282,7 @@ class Dicom_Reporter(object):
         self.walk_main_directory()
         self.dicom_explorer()
         self.create_association()
-        self.convert_types()
+        self.clean_dicom_dict()
         self.save_dcm_report()
 
     def create_contour_association(self):
@@ -348,11 +348,15 @@ class Dicom_Reporter(object):
         if self.verbose:
             print("Elapsed time {}s".format(int(time.time() - time_start)))
 
-    def convert_types(self):
+    def clean_dicom_dict(self):
+        remove_tag = ('ReferencedStudySequence', 'ReferencedFrameOfReferenceSequence')
         for dcm_uid_key in list(self.dicom_dict.keys()):
             for tag in list(self.dicom_dict[dcm_uid_key].keys()):
                 if isinstance(self.dicom_dict[dcm_uid_key][tag], pydicom.multival.MultiValue):
                     self.dicom_dict[dcm_uid_key][tag] = list(self.dicom_dict[dcm_uid_key][tag])
+            for k in remove_tag:
+                self.dicom_dict[dcm_uid_key].pop(k, None)
+
 
     def force_update(self):
         self.walk_main_directory()
