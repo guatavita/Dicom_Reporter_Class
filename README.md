@@ -116,6 +116,30 @@ def main():
     print("     Elapse time {}".format(time.time() - time_start))
 ```
 
+#### For cardiac images (multiple phases) DICOM data
+```
+    tv_template = {
+        'image_series_id': False,
+        'study_desc_name': True,
+        'merge_study_serie_desc': False,
+        'force_uint16': False,
+        'force_int16': True,
+        'include_patient_name': True,
+        'avoid_duplicate': False,
+        'split_by_cardiac_phase': True,
+    }
+
+    dicom_explorer = Dicom_Reporter(input_dir=input_dir,
+                                    output_dir=output_dir,
+                                    contour_names=contour_names,
+                                    contour_association=contour_association,
+                                    force_rewrite=True,
+                                    save_json=True,
+                                    load_json=True,
+                                    supp_tags=supp_tags, nb_threads=10,
+                                    verbose=True, **tv_template)
+    dicom_explorer.run_conversion()
+```
 ### Dependencies
 
 ```
