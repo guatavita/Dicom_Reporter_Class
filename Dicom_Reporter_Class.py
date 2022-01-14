@@ -226,11 +226,12 @@ def dicom_to_sitk(lstFilesDCM, force_uint16=False, force_int16=False):
 class Dicom_Reporter(object):
     def __init__(self, input_dir, output_dir=None, contour_names=[], contour_association={}, force_rewrite=False,
                  extension='.nii.gz', force_uint16=False, force_int16=False, image_series_id=False,
-                 study_desc_name=True, merge_study_serie_desc=True, save_json=True, load_json=True, supp_tags={},
+                 study_desc_name=True, merge_study_serie_desc=True,
+                 avoid_duplicate=False, save_json=True, load_json=True, supp_tags={},
                  nb_threads=int(0.5 * cpu_count()), verbose=False):
         '''
         :param input_dir: input folder where (unorganized) dicom can be found
-        :param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\StudyDate\StudyORSeriesDescription
+        :param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\SeriesDate\StudyORSeriesDescription
         :param contour_names: list of contour names that will be written, ALL if empty
         :param contour_association: dictionary of contour names association
         :param force_rewrite: for rewrite of NIfTI images (user should remove dcm_report.json)
@@ -240,6 +241,7 @@ class Dicom_Reporter(object):
         :param image_series_id: True if you want the series id in the image filename, if you expect multiple series in study output dir
         :param study_desc_folder_name: True if you want the output folder to be named after the StudyDescription (False -> SeriesDescription)
         :param merge_study_serie_desc: merge study and series descript for image folder name
+        :param avoid_duplicate: True if you want to add _N after folder name in case duplicate output foldername
         :param save_json: save dcm_report.json in output_dir
         :param load_json: reload previous dcm_report.json
         :param supp_tags: extract DICOM metadata for in-house usage, format dict such as {'SOPClassUID': '0008|0016',}
@@ -263,6 +265,7 @@ class Dicom_Reporter(object):
         self.image_series_id = image_series_id
         self.study_desc_name = study_desc_name
         self.merge_study_serie_desc = merge_study_serie_desc
+        self.avoid_duplicate = avoid_duplicate
         self.save_json = save_json
         self.load_json = load_json
         self.dcm_report_path = os.path.join(self.output_dir, 'dcm_report.json')
@@ -343,10 +346,10 @@ class Dicom_Reporter(object):
             print("Elapsed time {}s".format(int(time.time() - time_start)))
 
     def convert_types(self):
-        for dcm_sop_uid_key in list(self.dicom_dict.keys()):
-            for tag in list(self.dicom_dict[dcm_sop_uid_key].keys()):
-                if isinstance(self.dicom_dict[dcm_sop_uid_key][tag], pydicom.multival.MultiValue):
-                    self.dicom_dict[dcm_sop_uid_key][tag] = list(self.dicom_dict[dcm_sop_uid_key][tag])
+        for dcm_uid_key in list(self.dicom_dict.keys()):
+            for tag in list(self.dicom_dict[dcm_uid_key].keys()):
+                if isinstance(self.dicom_dict[dcm_uid_key][tag], pydicom.multival.MultiValue):
+                    self.dicom_dict[dcm_uid_key][tag] = list(self.dicom_dict[dcm_uid_key][tag])
 
     def force_update(self):
         self.walk_main_directory()
@@ -547,32 +550,32 @@ class Dicom_Reporter(object):
             if item is None:
                 break
             else:
-                sop_uid, output_dir = item
+                dcm_uid, output_dir = item
                 try:
                     if self.image_series_id:
                         output_filename = os.path.join(output_dir,
-                                                       'image_series_{}{}'.format(sop_uid, self.extension))
+                                                       'image_series_{}{}'.format(dcm_uid, self.extension))
                     else:
                         output_filename = os.path.join(output_dir, 'image{}'.format(self.extension))
 
                     if self.force_rewrite or not os.path.exists(output_filename):
-                        dicom_handle = dicom_to_sitk(self.dicom_dict[sop_uid]['dicom_filenames'],
+                        dicom_handle = dicom_to_sitk(self.dicom_dict[dcm_uid]['dicom_filenames'],
                                                      force_uint16=self.force_uint16, force_int16=self.force_int16)
                         sitk.WriteImage(dicom_handle, output_filename)
                     else:
                         # not sure if that is multithread safe either
                         dicom_handle = sitk.ReadImage(output_filename)
 
-                    if self.dicom_dict[sop_uid].get('RTDOSE'):
+                    if self.dicom_dict[dcm_uid].get('RTDOSE'):
                         self.rtdose_writer(output_dir=output_dir,
-                                           rtdose_sop_uid_list=self.dicom_dict[sop_uid]['RTDOSE'],
+                                           rtdose_sop_uid_list=self.dicom_dict[dcm_uid]['RTDOSE'],
                                            dicom_handle=dicom_handle)
 
-                    if self.dicom_dict[sop_uid].get('RTSTRUCT'):
+                    if self.dicom_dict[dcm_uid].get('RTSTRUCT'):
                         self.rtstruct_writer(output_dir=output_dir, dicom_handle=dicom_handle,
-                                             rtstruct_sop_uid_list=self.dicom_dict[sop_uid]['RTSTRUCT'])
+                                             rtstruct_sop_uid_list=self.dicom_dict[dcm_uid]['RTSTRUCT'])
                 except:
-                    print('Failed on {} {}'.format(sop_uid, output_dir))
+                    print('Failed on {} {}'.format(dcm_uid, output_dir))
                 q.task_done()
 
     def run_conversion(self):
@@ -590,30 +593,39 @@ class Dicom_Reporter(object):
         if self.verbose:
             time_start = time.time()
             print("\nConverting DICOM:")
-        for sop_uid in tqdm(list(self.dicom_dict.keys())):
-            output_path = os.path.join(self.output_dir, self.dicom_dict[sop_uid]['PatientID'].rstrip())
+        for dcm_uid in tqdm(list(self.dicom_dict.keys())):
+            output_path = os.path.join(self.output_dir, self.dicom_dict[dcm_uid]['PatientID'].rstrip())
 
             if self.merge_study_serie_desc:
                 description = "{}_{}".format(
-                    str(self.dicom_dict[sop_uid]['StudyDescription']).rstrip().replace(' ', '_'),
-                    str(self.dicom_dict[sop_uid]['SeriesDescription']).rstrip().replace(' ', '_'))
+                    str(self.dicom_dict[dcm_uid]['StudyDescription']).rstrip().replace(' ', '_'),
+                    str(self.dicom_dict[dcm_uid]['SeriesDescription']).rstrip().replace(' ', '_'))
             else:
                 if self.study_desc_name:
-                    description = str(self.dicom_dict[sop_uid]['StudyDescription']).rstrip().replace(' ', '_')
+                    description = str(self.dicom_dict[dcm_uid]['StudyDescription']).rstrip().replace(' ', '_')
                 else:
-                    description = str(self.dicom_dict[sop_uid]['SeriesDescription']).rstrip().replace(' ', '_')
+                    description = str(self.dicom_dict[dcm_uid]['SeriesDescription']).rstrip().replace(' ', '_')
 
             description = ''.join(e for e in description if e.isalnum() or e == '_')
-            if self.dicom_dict[sop_uid]['PresentationIntentType']:
+            if self.dicom_dict[dcm_uid]['PresentationIntentType']:
                 description += '_{}'.format(
-                    self.dicom_dict[sop_uid]['PresentationIntentType'].replace(' ', '_'))
+                    self.dicom_dict[dcm_uid]['PresentationIntentType'].replace(' ', '_'))
             output_dir = os.path.join(output_path,
-                                      '{}'.format(self.dicom_dict[sop_uid]['StudyDate']),
+                                      '{}'.format(self.dicom_dict[dcm_uid]['StudyDate']),
                                       '{}'.format(description))
+
+            # avoid duplicate folder name if no descriptions are available
+            if os.path.exists(output_dir) and self.avoid_duplicate:
+                last_output_dir = dir_list = glob.glob(output_dir+'*')[-1]
+                if last_output_dir[-1].isdigit():
+                    output_dir = last_output_dir[:-1] + str(int(last_output_dir[-1]) + 1)
+                else:
+                    output_dir = output_dir + '_1'
+
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
 
-            item = [sop_uid, output_dir]
+            item = [dcm_uid, output_dir]
             q.put(item)
 
         for worker in range(self.nb_threads):
