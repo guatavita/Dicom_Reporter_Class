@@ -43,6 +43,7 @@ tags = {
     'DoseSummationType': '3004|000a',
     'ROIContourSequence': '3006|0039',
     'StructureSetROISequence': '3006|0020',
+    'NominalPercentageOfCardiacPhase': '0020|9241',
 }
 
 
@@ -52,8 +53,8 @@ def splitext_(path):
     return os.path.splitext(path)
 
 
-def AddDicomToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
-    uid_dict = get_unique_uid_filenames(dicom_folder)
+def AddDicomToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, split_by_cardiac_phase=False):
+    uid_dict = get_unique_uid_filenames(dicom_folder, split_by_cardiac_phase)
     for series_uid in list(uid_dict.keys()):
         # test only the series because rtstruct and rtdose will be separated by SOPInstanceUID later
         if series_uid not in dicom_dict:
@@ -61,7 +62,7 @@ def AddDicomToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
             dictionary_creator(series_uid, dicom_filenames, dicom_dict, rd_dict, rt_dict, tags_dict)
 
 
-def get_unique_uid_filenames(dicom_folder):
+def get_unique_uid_filenames(dicom_folder, split_by_cardiac_phase=False):
     '''
     :param dicom_folder:
     :return: dictionary with list of .dcm files per SOPInstanceUID
@@ -75,6 +76,11 @@ def get_unique_uid_filenames(dicom_folder):
             continue
 
         series_uid = ds.get('SeriesInstanceUID')
+
+        if split_by_cardiac_phase:
+            cardiac_phase = ds.get('NominalPercentageOfCardiacPhase')
+            series_uid = '{}_split_{}'.format(series_uid, cardiac_phase)
+
         if series_uid not in uid_filenames:
             uid_filenames[series_uid] = []
 
@@ -157,9 +163,9 @@ def dicom_reader_worker(A):
         if item is None:
             break
         else:
-            dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, verbose = item
+            dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, split_by_cardiac_phase = item
             try:
-                AddDicomToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
+                AddDicomToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, split_by_cardiac_phase)
             except:
                 print('Failed on {}'.format(dicom_folder))
         q.task_done()
@@ -227,7 +233,7 @@ class Dicom_Reporter(object):
     def __init__(self, input_dir, output_dir=None, contour_names=[], contour_association={}, force_rewrite=False,
                  extension='.nii.gz', force_uint16=False, force_int16=False, image_series_id=False,
                  study_desc_name=True, merge_study_serie_desc=True, include_patient_name=False,
-                 avoid_duplicate=False, save_json=True, load_json=True, supp_tags={},
+                 avoid_duplicate=False, split_by_cardiac_phase=False, save_json=True, load_json=True, supp_tags={},
                  nb_threads=int(0.5 * cpu_count()), verbose=False):
         '''
         :param input_dir: input folder where (unorganized) dicom can be found
@@ -243,6 +249,7 @@ class Dicom_Reporter(object):
         :param merge_study_serie_desc: merge study and series descript for image folder name
         :param include_patient_name: include patient name with MRN in output folder name
         :param avoid_duplicate: True if you want to add _N after folder name in case duplicate output foldername
+        :param split_by_cardiac_phase: split SeriesInstanceUID using NominalPercentageOfCardiacPhase
         :param save_json: save dcm_report.json in output_dir
         :param load_json: reload previous dcm_report.json
         :param supp_tags: extract DICOM metadata for in-house usage, format dict such as {'SOPClassUID': '0008|0016',}
@@ -268,6 +275,7 @@ class Dicom_Reporter(object):
         self.merge_study_serie_desc = merge_study_serie_desc
         self.include_patient_name = include_patient_name
         self.avoid_duplicate = avoid_duplicate
+        self.split_by_cardiac_phase = split_by_cardiac_phase
         self.save_json = save_json
         self.load_json = load_json
         self.dcm_report_path = os.path.join(self.output_dir, 'dcm_report.json')
@@ -357,7 +365,6 @@ class Dicom_Reporter(object):
             for k in remove_tag:
                 self.dicom_dict[dcm_uid_key].pop(k, None)
 
-
     def force_update(self):
         self.walk_main_directory()
         self.dicom_explorer()
@@ -432,7 +439,8 @@ class Dicom_Reporter(object):
             time_start = time.time()
             print("\nReading DICOM:")
         for dicom_folder in tqdm(self.folders_with_dcm):
-            item = [dicom_folder, self.dicom_dict, self.rd_dict, self.rt_dict, self.tags_dict, self.verbose]
+            item = [dicom_folder, self.dicom_dict, self.rd_dict, self.rt_dict, self.tags_dict,
+                    self.split_by_cardiac_phase]
             q.put(item)
 
         for worker in range(self.nb_threads):
@@ -603,7 +611,9 @@ class Dicom_Reporter(object):
         for dcm_uid in tqdm(list(self.dicom_dict.keys())):
             if self.include_patient_name:
                 output_path = os.path.join(self.output_dir,
-                                           "{}_{}".format('^'.join([x for x in self.dicom_dict[dcm_uid]['PatientName'].split('^') if x]).title(),
+                                           "{}_{}".format('^'.join(
+                                               [x for x in self.dicom_dict[dcm_uid]['PatientName'].split('^') if
+                                                x]).title(),
                                                           self.dicom_dict[dcm_uid]['PatientID'].rstrip()))
             else:
                 output_path = os.path.join(self.output_dir, self.dicom_dict[dcm_uid]['PatientID'].rstrip())
@@ -622,6 +632,9 @@ class Dicom_Reporter(object):
             if self.dicom_dict[dcm_uid]['PresentationIntentType']:
                 description += '_{}'.format(
                     self.dicom_dict[dcm_uid]['PresentationIntentType'].replace(' ', '_'))
+
+            if self.split_by_cardiac_phase:
+                description += '_{}'.format(self.dicom_dict[dcm_uid]['NominalPercentageOfCardiacPhase'])
 
             # some dicom can have the same StudyDate as other dicom but not the same SeriesDate
             output_date = self.dicom_dict[dcm_uid]['StudyDate']
