@@ -599,8 +599,8 @@ class Dicom_Reporter(object):
         for dcm_uid in tqdm(list(self.dicom_dict.keys())):
             if self.include_patient_name:
                 output_path = os.path.join(self.output_dir,
-                                           "{}_{}".format(self.dicom_dict[dcm_uid]['PatientID'].rstrip(), '^'.join(
-                                               [x for x in self.dicom_dict[dcm_uid]['PatientName'].split('^') if x]).title()))
+                                           "{}_{}".format('^'.join([x for x in self.dicom_dict[dcm_uid]['PatientName'].split('^') if x]).title(),
+                                                          self.dicom_dict[dcm_uid]['PatientID'].rstrip()))
             else:
                 output_path = os.path.join(self.output_dir, self.dicom_dict[dcm_uid]['PatientID'].rstrip())
 
