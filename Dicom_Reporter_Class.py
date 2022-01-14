@@ -51,47 +51,47 @@ def splitext_(path):
     return os.path.splitext(path)
 
 
-def AddDicomSeriesToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
-    series_ids_dict = get_unique_series_ids_filenames(dicom_folder)
-    for series_id in list(series_ids_dict.keys()):
-        if series_id not in dicom_dict and series_id not in rd_dict:
-            dicom_filenames = series_ids_dict.get(series_id)
-            dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, rt_dict, tags_dict)
+def AddDicomSOPToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict):
+    sop_uid_dict = get_unique_sop_uid_filenames(dicom_folder)
+    for sop_uid in list(sop_uid_dict.keys()):
+        if sop_uid not in dicom_dict and sop_uid not in rd_dict and sop_uid not in rt_dict:
+            dicom_filenames = sop_uid_dict.get(sop_uid)
+            dictionary_creator(sop_uid, dicom_filenames, dicom_dict, rd_dict, rt_dict, tags_dict)
 
 
-def get_unique_series_ids(dicom_folder):
+def get_unique_sop_uid(dicom_folder):
     '''
     :param dicom_folder:
-    :return: list of unique seriesID in the folder
+    :return: list of unique SOPInstanceUID in the folder
     '''
-    series_id_list = []
+    sop_uid_list = []
     filenames = glob.glob(os.path.join(dicom_folder, "*.dcm"))
     for filename in filenames:
         try:
             ds = pydicom.dcmread(filename, stop_before_pixels=True)
         except:
             continue
-        series_id = ds.get('SeriesInstanceUID')
-        if series_id not in series_id_list:
-            series_id_list.append(series_id)
-    return series_id_list
+        sop_uid = ds.get('SOPInstanceUID')
+        if sop_uid not in sop_uid_list:
+            sop_uid_list.append(sop_uid)
+    return sop_uid_list
 
 
-def get_unique_series_ids_filenames(dicom_folder):
+def get_unique_sop_uid_filenames(dicom_folder):
     '''
     :param dicom_folder:
-    :return: dictionary with list of .dcm files per seriesID
+    :return: dictionary with list of .dcm files per SOPInstanceUID
     '''
-    series_id_filenames = {}
+    sop_uid_filenames = {}
     filenames = glob.glob(os.path.join(dicom_folder, "*.dcm"))
     for filename in filenames:
         try:
             ds = pydicom.dcmread(filename, stop_before_pixels=True)
         except:
             continue
-        series_id = ds.get('SeriesInstanceUID')
-        if series_id not in series_id_filenames:
-            series_id_filenames[series_id] = []
+        sop_uid = ds.get('SOPInstanceUID')
+        if sop_uid not in sop_uid_filenames:
+            sop_uid_filenames[sop_uid] = []
 
         # force test not None because you can have a SliceLocation == 0.0
         if ds.get('SliceLocation') is not None:
@@ -100,31 +100,13 @@ def get_unique_series_ids_filenames(dicom_folder):
             slice_loc = float(ds.get('InstanceNumber'))
         else:
             slice_loc = 0
-        series_id_filenames[series_id].append([slice_loc, filename])
+        sop_uid_filenames[sop_uid].append([slice_loc, filename])
 
-    for series_id in list(series_id_filenames.keys()):
-        series_id_filenames.get(series_id).sort()
-        series_id_filenames[series_id] = [i[-1] for i in series_id_filenames.get(series_id)]
+    for sop_uid in list(sop_uid_filenames.keys()):
+        sop_uid_filenames.get(sop_uid).sort()
+        sop_uid_filenames[sop_uid] = [i[-1] for i in sop_uid_filenames.get(sop_uid)]
 
-    return series_id_filenames
-
-
-def return_sitk_series_ids(reader, input_folder, get_filenames=False):
-    '''
-    :param reader: sitk.ImageSeriesReader
-    :param input_folder:
-    :param get_filenames: dictionary or list of the series ID per dicom
-    :return:
-    '''
-    # GetGDCMSeriesIDs seems to be randomly unstable with multi-threads (memory management issue?)
-    series_ids_list = reader.GetGDCMSeriesIDs(input_folder)
-    if get_filenames:
-        series_dict = {}
-        for series_id in series_ids_list:
-            series_dict[series_id] = reader.GetGDCMSeriesFileNames(input_folder, series_id)
-        return series_dict
-    else:
-        return series_ids_list
+    return sop_uid_filenames
 
 
 def recurse(ds):
@@ -146,9 +128,9 @@ def recurse(ds):
     return elem_list
 
 
-def dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, rt_dict, tags_dict):
+def dictionary_creator(sop_uid, dicom_filenames, dicom_dict, rd_dict, rt_dict, tags_dict):
     '''
-    :param series_id:
+    :param sop_uid:
     :param dicom_filenames: list
     :return:
     '''
@@ -159,47 +141,28 @@ def dictionary_creator(series_id, dicom_filenames, dicom_dict, rd_dict, rt_dict,
         print("Dicom cannot be read {}".format(dicom_filenames[0]))
         return
 
-    series_dict = {}
-    series_dict['dicom_filenames'] = dicom_filenames
+    sop_uid_dict = {}
+    sop_uid_dict['dicom_filenames'] = dicom_filenames
     modality = ds.get('Modality')
     ds_all = {k.keyword: k.value for k in recurse(ds)}
     for tag_name in list(tags_dict.keys()):
         if tag_name == 'PatientName':
-            series_dict[tag_name] = str(ds.get(tag_name))
+            sop_uid_dict[tag_name] = str(ds.get(tag_name))
         else:
-            series_dict[tag_name] = ds.get(tag_name)
+            sop_uid_dict[tag_name] = ds.get(tag_name)
 
-        if not series_dict[tag_name]:
-            series_dict[tag_name] = ds_all.get(tag_name)
+        if not sop_uid_dict[tag_name]:
+            sop_uid_dict[tag_name] = ds_all.get(tag_name)
 
     if modality.lower() == 'rtdose':
-        if series_id not in rd_dict:
-            rd_dict[series_id] = series_dict
+        if sop_uid not in rd_dict:
+            rd_dict[sop_uid] = sop_uid_dict
     elif modality.lower() == 'rtstruct':
-        if series_id not in rt_dict:
-            rt_dict[series_id] = series_dict
+        if sop_uid not in rt_dict:
+            rt_dict[sop_uid] = sop_uid_dict
     else:
-        if series_id not in dicom_dict:
-            dicom_dict[series_id] = series_dict
-
-
-def rtstruct_reader_to_dict(rtstruct_files, rt_dict, tags_dict):
-    for rtstruct_file in rtstruct_files:
-        try:
-            ds = pydicom.dcmread(rtstruct_file)
-        except:
-            print("Dicom cannot be read {}".format(rtstruct_file))
-            return
-        series_id = ds.get('SeriesInstanceUID')
-        if series_id not in rt_dict:
-            series_dict = {}
-            series_dict['dicom_filenames'] = [rtstruct_file]
-            for tag_name in list(tags_dict.keys()):
-                tag_key = tags_dict.get(tag_name)
-                if not tag_key:
-                    continue
-                series_dict[tag_name] = ds.get(tag_name)
-            rt_dict[series_id] = series_dict
+        if sop_uid not in dicom_dict:
+            dicom_dict[sop_uid] = sop_uid_dict
 
 
 def dicom_reader_worker(A):
@@ -211,7 +174,7 @@ def dicom_reader_worker(A):
         else:
             dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict, verbose = item
             try:
-                AddDicomSeriesToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
+                AddDicomSOPToDict(dicom_folder, dicom_dict, rd_dict, rt_dict, tags_dict)
             except:
                 print('Failed on {}'.format(dicom_folder))
         q.task_done()
@@ -347,46 +310,46 @@ class Dicom_Reporter(object):
             time_start = time.time()
             print("\nMerging RTDOSE:")
         # merging rdstruct to the corresponding study instance uid of the images
-        for rd_series_key in list(self.rd_dict.keys()):
-            rd_study_instance_uid = self.rd_dict[rd_series_key]['StudyInstanceUID']
-            rd_reference_uid = self.rd_dict[rd_series_key]['ReferencedSOPInstanceUID']
+        for rd_sop_uid_key in list(self.rd_dict.keys()):
+            rd_study_instance_uid = self.rd_dict[rd_sop_uid_key]['StudyInstanceUID']
+            rd_reference_uid = self.rd_dict[rd_sop_uid_key]['ReferencedSOPInstanceUID']
             if not rd_study_instance_uid or not rd_reference_uid:
                 continue
-            for dcm_series_key in list(self.dicom_dict.keys()):
-                dcm_study_instance_uid = self.dicom_dict[dcm_series_key]['StudyInstanceUID']
+            for dcm_sop_uid_key in list(self.dicom_dict.keys()):
+                dcm_study_instance_uid = self.dicom_dict[dcm_sop_uid_key]['StudyInstanceUID']
                 if not dcm_study_instance_uid:
                     continue
-                if dcm_study_instance_uid == rd_study_instance_uid and rd_reference_uid == dcm_series_key:
-                    if not self.dicom_dict[dcm_series_key].get('RTDOSE'):
-                        self.dicom_dict[dcm_series_key]['RTDOSE'] = []
-                    if rd_series_key not in self.dicom_dict[dcm_series_key]['RTDOSE']:
-                        self.dicom_dict[dcm_series_key]['RTDOSE'].append(rd_series_key)
+                if dcm_study_instance_uid == rd_study_instance_uid and rd_reference_uid == dcm_sop_uid_key:
+                    if not self.dicom_dict[dcm_sop_uid_key].get('RTDOSE'):
+                        self.dicom_dict[dcm_sop_uid_key]['RTDOSE'] = []
+                    if rd_sop_uid_key not in self.dicom_dict[dcm_sop_uid_key]['RTDOSE']:
+                        self.dicom_dict[dcm_sop_uid_key]['RTDOSE'].append(rd_sop_uid_key)
 
         if self.verbose:
             print("\nMerging RTSTRUCT:")
         # merging rtstruct to the corresponding study instance uid of the images
-        for rt_series_key in list(self.rt_dict.keys()):
-            rt_study_instance_uid = self.rt_dict[rt_series_key]['StudyInstanceUID']
-            rt_reference_uid = self.rt_dict[rt_series_key]['ReferencedSOPInstanceUID']
+        for rt_sop_uid_key in list(self.rt_dict.keys()):
+            rt_study_instance_uid = self.rt_dict[rt_sop_uid_key]['StudyInstanceUID']
+            rt_reference_uid = self.rt_dict[rt_sop_uid_key]['ReferencedSOPInstanceUID']
             if not rt_study_instance_uid or not rt_reference_uid:
                 continue
-            for dcm_series_key in list(self.dicom_dict.keys()):
-                dcm_study_instance_uid = self.dicom_dict[dcm_series_key]['StudyInstanceUID']
+            for dcm_sop_uid_key in list(self.dicom_dict.keys()):
+                dcm_study_instance_uid = self.dicom_dict[dcm_sop_uid_key]['StudyInstanceUID']
                 if not dcm_study_instance_uid:
                     continue
-                if dcm_study_instance_uid == rt_study_instance_uid and rt_reference_uid == dcm_series_key:
-                    if not self.dicom_dict[dcm_series_key].get('RTSTRUCT'):
-                        self.dicom_dict[dcm_series_key]['RTSTRUCT'] = []
-                    if rt_series_key not in self.dicom_dict[dcm_series_key]['RTSTRUCT']:
-                        self.dicom_dict[dcm_series_key]['RTSTRUCT'].append(rt_series_key)
+                if dcm_study_instance_uid == rt_study_instance_uid and rt_reference_uid == dcm_sop_uid_key:
+                    if not self.dicom_dict[dcm_sop_uid_key].get('RTSTRUCT'):
+                        self.dicom_dict[dcm_sop_uid_key]['RTSTRUCT'] = []
+                    if rt_sop_uid_key not in self.dicom_dict[dcm_sop_uid_key]['RTSTRUCT']:
+                        self.dicom_dict[dcm_sop_uid_key]['RTSTRUCT'].append(rt_sop_uid_key)
         if self.verbose:
             print("Elapsed time {}s".format(int(time.time() - time_start)))
 
     def convert_types(self):
-        for dcm_series_key in list(self.dicom_dict.keys()):
-            for tag in list(self.dicom_dict[dcm_series_key].keys()):
-                if isinstance(self.dicom_dict[dcm_series_key][tag], pydicom.multival.MultiValue):
-                    self.dicom_dict[dcm_series_key][tag] = list(self.dicom_dict[dcm_series_key][tag])
+        for dcm_sop_uid_key in list(self.dicom_dict.keys()):
+            for tag in list(self.dicom_dict[dcm_sop_uid_key].keys()):
+                if isinstance(self.dicom_dict[dcm_sop_uid_key][tag], pydicom.multival.MultiValue):
+                    self.dicom_dict[dcm_sop_uid_key][tag] = list(self.dicom_dict[dcm_sop_uid_key][tag])
 
     def force_update(self):
         self.walk_main_directory()
@@ -474,41 +437,41 @@ class Dicom_Reporter(object):
             print("Elapsed time {}s".format(int(time.time() - time_start)))
             if self.dicom_dict:
                 nb_dicom = 0
-                for series_id in list(self.dicom_dict.keys()):
-                    nb_dicom += len(self.dicom_dict[series_id]['dicom_filenames'])
+                for sop_uid in list(self.dicom_dict.keys()):
+                    nb_dicom += len(self.dicom_dict[sop_uid]['dicom_filenames'])
                 print("Nb DICOM files to process: {}".format(nb_dicom))
 
             if self.rd_dict:
                 nb_rtdose = 0
-                for series_id in list(self.rd_dict.keys()):
-                    nb_rtdose += len(self.rd_dict[series_id]['dicom_filenames'])
+                for sop_uid in list(self.rd_dict.keys()):
+                    nb_rtdose += len(self.rd_dict[sop_uid]['dicom_filenames'])
                 print("Nb RTDOSE files to process: {}".format(nb_rtdose))
 
             if self.rt_dict:
                 nb_rtstruct = 0
-                for series_id in list(self.rt_dict.keys()):
-                    nb_rtstruct += len(self.rt_dict[series_id]['dicom_filenames'])
+                for sop_uid in list(self.rt_dict.keys()):
+                    nb_rtstruct += len(self.rt_dict[sop_uid]['dicom_filenames'])
                 print("Nb RTSTRUCT files to process: {}".format(nb_rtstruct))
 
-    def rtdose_writer(self, output_dir, rtdose_series=[], dicom_handle=None):
+    def rtdose_writer(self, output_dir, rtdose_sop_uid_list=[], dicom_handle=None):
         '''
         :param output_dir: output directory
-        :param rtdose_series: list of RTDOSE id to point toward the dictionary in RTdose
+        :param rtdose_sop_uid_list: list of RTDOSE id to point toward in the dictionary
         :param dicom_handle: reference dicom to resample RTDOSE if available
         :return:
         '''
 
         i = 0
-        for rtdose_series_id in rtdose_series:
-            if not self.rd_dict.get(rtdose_series_id):
+        for rtdose_sop_uid in rtdose_sop_uid_list:
+            if not self.rd_dict.get(rtdose_sop_uid):
                 continue
-            dose_handle = dicom_to_sitk(self.rd_dict[rtdose_series_id]['dicom_filenames'], force_uint16=False,
+            dose_handle = dicom_to_sitk(self.rd_dict[rtdose_sop_uid]['dicom_filenames'], force_uint16=False,
                                         force_int16=False)
             origin = dose_handle.GetOrigin()
             spacing = dose_handle.GetSpacing()
             dose_array = np.squeeze(sitk.GetArrayFromImage(dose_handle).astype(np.float32))
-            if self.rd_dict[rtdose_series_id]['DoseGridScaling']:
-                dose_array = dose_array * float(self.rd_dict[rtdose_series_id]['DoseGridScaling'])
+            if self.rd_dict[rtdose_sop_uid]['DoseGridScaling']:
+                dose_array = dose_array * float(self.rd_dict[rtdose_sop_uid]['DoseGridScaling'])
             if len(dose_array.shape) > 3:
                 for c in range(dose_array.shape[0]):
                     dose_handle = sitk.GetImageFromArray(dose_array[c])
@@ -517,7 +480,7 @@ class Dicom_Reporter(object):
                     if dicom_handle:
                         dose_handle = sitk.Resample(dose_handle, dicom_handle)
                     output_filename = os.path.join(output_dir, 'dose_{}_{}_{}{}'.format(i, self.rd_dict[
-                        rtdose_series_id]['DoseSummationType'], c, self.extension))
+                        rtdose_sop_uid]['DoseSummationType'], c, self.extension))
                     if self.force_rewrite or not os.path.exists(output_filename):
                         sitk.WriteImage(dose_handle, output_filename)
             else:
@@ -527,21 +490,21 @@ class Dicom_Reporter(object):
                 if dicom_handle:
                     dose_handle = sitk.Resample(dose_handle, dicom_handle)
                 output_filename = os.path.join(output_dir, 'dose_{}_{}{}'.format(i, self.rd_dict[
-                    rtdose_series_id]['DoseSummationType'], self.extension))
+                    rtdose_sop_uid]['DoseSummationType'], self.extension))
                 if self.force_rewrite or not os.path.exists(output_filename):
                     sitk.WriteImage(dose_handle, output_filename)
             i += 1
 
-    def rtstruct_writer(self, output_dir, dicom_handle, rtstruct_series=[]):
+    def rtstruct_writer(self, output_dir, dicom_handle, rtstruct_sop_uid_list=[]):
         ref_size = dicom_handle.GetSize()
         ref_origin = dicom_handle.GetOrigin()
         ref_spacing = dicom_handle.GetSpacing()
-        for rtstruct_series_id in rtstruct_series:
-            if not self.rt_dict.get(rtstruct_series_id):
+        for rtstruct_sop_uid in rtstruct_sop_uid_list:
+            if not self.rt_dict.get(rtstruct_sop_uid):
                 continue
             try:
-                for roi_structset, roi_contour in zip(self.rt_dict[rtstruct_series_id].get('StructureSetROISequence'),
-                                                      self.rt_dict[rtstruct_series_id].get('ROIContourSequence')):
+                for roi_structset, roi_contour in zip(self.rt_dict[rtstruct_sop_uid].get('StructureSetROISequence'),
+                                                      self.rt_dict[rtstruct_sop_uid].get('ROIContourSequence')):
                     roi_name = roi_structset.ROIName
                     if self.contour_names and not self.contour_association.get(roi_name):
                         continue
@@ -578,7 +541,7 @@ class Dicom_Reporter(object):
                         mask_handle.SetSpacing(ref_spacing)
                         sitk.WriteImage(mask_handle, output_filename)
             except:
-                print('Failed to match rtstruct {} out {}'.format(rtstruct_series_id, output_dir))
+                print('Failed to match rtstruct {} out {}'.format(rtstruct_sop_uid, output_dir))
 
     def dicom_writer_worker(self, A):
         q = A[0]
@@ -587,31 +550,31 @@ class Dicom_Reporter(object):
             if item is None:
                 break
             else:
-                series_id, output_dir = item
+                sop_uid, output_dir = item
                 try:
                     if self.image_series_id:
                         output_filename = os.path.join(output_dir,
-                                                       'image_series_{}{}'.format(series_id, self.extension))
+                                                       'image_series_{}{}'.format(sop_uid, self.extension))
                     else:
                         output_filename = os.path.join(output_dir, 'image{}'.format(self.extension))
 
                     if self.force_rewrite or not os.path.exists(output_filename):
-                        dicom_handle = dicom_to_sitk(self.dicom_dict[series_id]['dicom_filenames'],
+                        dicom_handle = dicom_to_sitk(self.dicom_dict[sop_uid]['dicom_filenames'],
                                                      force_uint16=self.force_uint16, force_int16=self.force_int16)
                         sitk.WriteImage(dicom_handle, output_filename)
                     else:
                         # not sure if that is multithread safe either
                         dicom_handle = sitk.ReadImage(output_filename)
 
-                    if self.dicom_dict[series_id].get('RTDOSE'):
-                        self.rtdose_writer(output_dir=output_dir, rtdose_series=self.dicom_dict[series_id]['RTDOSE'],
+                    if self.dicom_dict[sop_uid].get('RTDOSE'):
+                        self.rtdose_writer(output_dir=output_dir, rtdose_sop_uid_list=self.dicom_dict[sop_uid]['RTDOSE'],
                                            dicom_handle=dicom_handle)
 
-                    if self.dicom_dict[series_id].get('RTSTRUCT'):
+                    if self.dicom_dict[sop_uid].get('RTSTRUCT'):
                         self.rtstruct_writer(output_dir=output_dir, dicom_handle=dicom_handle,
-                                             rtstruct_series=self.dicom_dict[series_id]['RTSTRUCT'])
+                                             rtstruct_sop_uid_list=self.dicom_dict[sop_uid]['RTSTRUCT'])
                 except:
-                    print('Failed on {} {}'.format(series_id, output_dir))
+                    print('Failed on {} {}'.format(sop_uid, output_dir))
                 q.task_done()
 
     def run_conversion(self):
@@ -629,30 +592,30 @@ class Dicom_Reporter(object):
         if self.verbose:
             time_start = time.time()
             print("\nConverting DICOM:")
-        for series_id in tqdm(list(self.dicom_dict.keys())):
-            output_path = os.path.join(self.output_dir, self.dicom_dict[series_id]['PatientID'].rstrip())
+        for sop_uid in tqdm(list(self.dicom_dict.keys())):
+            output_path = os.path.join(self.output_dir, self.dicom_dict[sop_uid]['PatientID'].rstrip())
 
             if self.merge_study_serie_desc:
                 description = "{}_{}".format(
-                    str(self.dicom_dict[series_id]['StudyDescription']).rstrip().replace(' ', '_'),
-                    str(self.dicom_dict[series_id]['SeriesDescription']).rstrip().replace(' ', '_'))
+                    str(self.dicom_dict[sop_uid]['StudyDescription']).rstrip().replace(' ', '_'),
+                    str(self.dicom_dict[sop_uid]['SeriesDescription']).rstrip().replace(' ', '_'))
             else:
                 if self.study_desc_name:
-                    description = str(self.dicom_dict[series_id]['StudyDescription']).rstrip().replace(' ', '_')
+                    description = str(self.dicom_dict[sop_uid]['StudyDescription']).rstrip().replace(' ', '_')
                 else:
-                    description = str(self.dicom_dict[series_id]['SeriesDescription']).rstrip().replace(' ', '_')
+                    description = str(self.dicom_dict[sop_uid]['SeriesDescription']).rstrip().replace(' ', '_')
 
             description = ''.join(e for e in description if e.isalnum() or e == '_')
-            if self.dicom_dict[series_id]['PresentationIntentType']:
+            if self.dicom_dict[sop_uid]['PresentationIntentType']:
                 description += '_{}'.format(
-                    self.dicom_dict[series_id]['PresentationIntentType'].replace(' ', '_'))
+                    self.dicom_dict[sop_uid]['PresentationIntentType'].replace(' ', '_'))
             output_dir = os.path.join(output_path,
-                                      '{}'.format(self.dicom_dict[series_id]['StudyDate']),
+                                      '{}'.format(self.dicom_dict[sop_uid]['StudyDate']),
                                       '{}'.format(description))
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
 
-            item = [series_id, output_dir]
+            item = [sop_uid, output_dir]
             q.put(item)
 
         for worker in range(self.nb_threads):
