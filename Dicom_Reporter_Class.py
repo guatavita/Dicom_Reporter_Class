@@ -198,6 +198,9 @@ def dicom_to_sitk(lstFilesDCM, force_uint16=False, force_int16=False):
             z_spacing = abs(RefDs.get('SliceLocation') - SdDs.get('SliceLocation'))
         elif RefDs.get('SliceThickness'):
             z_spacing = RefDs.get('SliceThickness')
+    elif RefDs.get('SliceThickness'):
+         # duplicated test for RTdose that have SliceThickness as Z spacing but also 1 DCM file
+        z_spacing = RefDs.get('SliceThickness')
 
     ArrayDicom = pydicom.pixel_data_handlers.apply_rescale(ArrayDicom, RefDs)
 
