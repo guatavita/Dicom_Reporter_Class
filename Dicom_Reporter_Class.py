@@ -263,6 +263,7 @@ class Dicom_Reporter(object):
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.dicom_dict = {}
+        self.convert_report = {}
         self.rt_dict = {}
         self.rd_dict = {}
         self.contour_names = contour_names
@@ -282,6 +283,7 @@ class Dicom_Reporter(object):
         self.save_json = save_json
         self.load_json = load_json
         self.dcm_report_path = os.path.join(self.output_dir, 'dcm_report.json')
+        self.convert_report_path = os.path.join(self.output_dir, 'convert_report.json')
         self.verbose = verbose
 
         # folder that contains dicom
@@ -294,7 +296,7 @@ class Dicom_Reporter(object):
         self.dicom_explorer()
         self.create_association()
         self.clean_dicom_dict()
-        self.save_dcm_report()
+        self.save_dcm_report(self.dicom_dict, self.dcm_report_path)
 
     def create_contour_association(self):
         if self.contour_names:
@@ -371,7 +373,7 @@ class Dicom_Reporter(object):
     def force_update(self):
         self.walk_main_directory()
         self.dicom_explorer()
-        self.save_dcm_report()
+        self.save_dcm_report(self.dicom_dict, self.dcm_report_path)
 
     def load_dcm_report(self):
         if self.load_json:
@@ -382,24 +384,24 @@ class Dicom_Reporter(object):
                     except:
                         print("JSON file could not be loaded")
 
-    def save_dcm_report(self):
+    def save_dcm_report(self, report_dict, dict_path):
         if self.save_json and self.output_dir:
             if not os.path.exists(self.output_dir):
                 os.makedirs(self.output_dir)
-            with open(self.dcm_report_path, 'w') as f:
+            with open(dict_path, 'w') as f:
                 try:
-                    json.dump(self.dicom_dict, f)
+                    json.dump(report_dict, f)
                 except:
                     print("JSON file could not be saved")
 
             # number of keys per element of the dict should be same because we define the header of the txt file
-            keys = list(self.dicom_dict.keys())
-            tags = list(self.dicom_dict[keys[0]].keys())
-            output_txt = open(self.dcm_report_path.replace('.json', '.txt'), 'w')
+            keys = list(report_dict.keys())
+            tags = list(report_dict[keys[0]].keys())
+            output_txt = open(dict_path.replace('.json', '.txt'), 'w')
             output_txt.write('{}\n'.format(','.join(tags)))
             for key in keys:
                 for tag in tags:
-                    tag_value = self.dicom_dict[key].get(tag)
+                    tag_value = report_dict[key].get(tag)
                     if isinstance(tag_value, str):
                         tag_value = tag_value.replace(',', '')
                     if isinstance(tag_value, list):
@@ -513,7 +515,8 @@ class Dicom_Reporter(object):
                     sitk.WriteImage(dose_handle, output_filename)
             i += 1
 
-    def rtstruct_writer(self, output_dir, dicom_handle, rtstruct_sop_uid_list=[]):
+    def rtstruct_writer(self, output_dir, dicom_handle, rtstruct_sop_uid_list=[], warning=False):
+        detailed_report = []
         ref_size = dicom_handle.GetSize()
         ref_origin = dicom_handle.GetOrigin()
         ref_spacing = dicom_handle.GetSpacing()
@@ -521,6 +524,7 @@ class Dicom_Reporter(object):
             if not self.rt_dict.get(rtstruct_sop_uid):
                 continue
             try:
+                detailed_report.append(rtstruct_sop_uid)
                 for roi_structset, roi_contour in zip(self.rt_dict[rtstruct_sop_uid].get('StructureSetROISequence'),
                                                       self.rt_dict[rtstruct_sop_uid].get('ROIContourSequence')):
                     roi_name = roi_structset.ROIName
@@ -558,8 +562,12 @@ class Dicom_Reporter(object):
                         mask_handle.SetOrigin(ref_origin)
                         mask_handle.SetSpacing(ref_spacing)
                         sitk.WriteImage(mask_handle, output_filename)
+                        detailed_report.append('{}_{}'.format(roi_name, '_SUCCESS'))
             except:
                 print('Failed to match rtstruct {} out {}'.format(rtstruct_sop_uid, output_dir))
+                detailed_report.append('{}_{}'.format(rtstruct_sop_uid, '_FAILURE_RT_NO_MATCH'))
+                warning = True
+        return detailed_report, warning
 
     def dicom_writer_worker(self, A):
         q = A[0]
@@ -587,33 +595,36 @@ class Dicom_Reporter(object):
                     else:
                         # not sure if that is multithread safe either
                         dicom_handle = sitk.ReadImage(output_filename)
-                    self.dicom_dict[dcm_uid]['dicom_convert'] = 'DONE'
+                    self.convert_report[dcm_uid]['dicom_convert'] = 'DONE'
                 except:
                     print('Failed on image convert {} {}'.format(dcm_uid, output_dir))
-                    self.dicom_dict[dcm_uid]['dicom_convert'] = 'FAILED'
+                    self.convert_report[dcm_uid]['dicom_convert'] = 'FAILED'
 
                 try:
                     if self.dicom_dict[dcm_uid].get('RTDOSE'):
+                        self.convert_report[dcm_uid]['rtdose_convert'] = 'DONE'
                         self.rtdose_writer(output_dir=output_dir,
                                            rtdose_sop_uid_list=self.dicom_dict[dcm_uid]['RTDOSE'],
                                            dicom_handle=dicom_handle)
-                        self.dicom_dict[dcm_uid]['rtdose_convert'] = 'DONE'
                     else:
-                        self.dicom_dict[dcm_uid]['rtdose_convert'] = 'NONE'
+                        self.convert_report[dcm_uid]['rtdose_convert'] = 'NONE'
                 except:
                     print('Failed on RTdose convert {} {}'.format(dcm_uid, output_dir))
-                    self.dicom_dict[dcm_uid]['rtdose_convert'] = 'FAILED'
+                    self.convert_report[dcm_uid]['rtdose_convert'] = 'FAILED'
 
                 try:
                     if self.dicom_dict[dcm_uid].get('RTSTRUCT'):
-                        self.rtstruct_writer(output_dir=output_dir, dicom_handle=dicom_handle,
+                        self.convert_report[dcm_uid]['rtstruct_convert'] = 'DONE'
+                        detailed_report, warning = self.rtstruct_writer(output_dir=output_dir, dicom_handle=dicom_handle,
                                              rtstruct_sop_uid_list=self.dicom_dict[dcm_uid]['RTSTRUCT'])
-                        self.dicom_dict[dcm_uid]['rtstruct_convert'] = 'DONE'
+                        self.convert_report[dcm_uid]['rtstruct_report'] = detailed_report
+                        if warning:
+                            self.convert_report[dcm_uid]['rtstruct_convert'] = 'WARNING'
                     else:
-                        self.dicom_dict[dcm_uid]['rtstruct_convert'] = 'NONE'
+                        self.convert_report[dcm_uid]['rtstruct_convert'] = 'NONE'
                 except:
                     print('Failed on RTstruct convert {} {}'.format(dcm_uid, output_dir))
-                    self.dicom_dict[dcm_uid]['rtstruct_convert'] = 'FAILED'
+                    self.convert_report[dcm_uid]['rtstruct_convert'] = 'FAILED'
 
                 q.task_done()
 
@@ -633,6 +644,12 @@ class Dicom_Reporter(object):
             time_start = time.time()
             print("\nConverting DICOM:")
         for dcm_uid in tqdm(list(self.dicom_dict.keys())):
+            self.convert_report[dcm_uid] = {}
+            self.convert_report[dcm_uid]['PatientName'] = self.dicom_dict[dcm_uid]['PatientName']
+            self.convert_report[dcm_uid]['PatientID'] = self.dicom_dict[dcm_uid]['PatientID']
+            self.convert_report[dcm_uid]['PatientName'] = self.dicom_dict[dcm_uid]['PatientName']
+            self.convert_report[dcm_uid]['dicom_filenames'] = self.dicom_dict[dcm_uid]['dicom_filenames']
+
             if self.include_patient_name:
                 output_path = os.path.join(self.output_dir,
                                            "{}_{}".format('^'.join(
@@ -690,4 +707,4 @@ class Dicom_Reporter(object):
         if self.verbose:
             print("Elapsed time {}s".format(int(time.time() - time_start)))
 
-        self.save_dcm_report()
+        self.save_dcm_report(self.convert_report, self.convert_report_path)
