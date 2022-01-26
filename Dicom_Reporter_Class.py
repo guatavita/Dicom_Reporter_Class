@@ -565,7 +565,7 @@ class Dicom_Reporter(object):
                         detailed_report.append('{}_{}'.format(roi_name, 'SUCCESS'))
             except:
                 print('Failed to match rtstruct {} out {}'.format(rtstruct_sop_uid, output_dir))
-                detailed_report.append('{}_{}'.format(rtstruct_sop_uid, 'FAILURE_RT_NO_MATCH'))
+                detailed_report.append('FAILURE_RT_NO_MATCH')
                 warning = True
         return detailed_report, warning
 
