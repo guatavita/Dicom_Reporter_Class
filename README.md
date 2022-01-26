@@ -25,7 +25,7 @@ bastien.rigaud@univ-rennes1.fr
 
 ## Parameter example
 
-```python
+```
 :param input_dir: input folder where (unorganized) dicom can be found
 :param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\Date\StudyORSeriesDescription
 :param contour_names: list of contour names that will be written, ALL if empty
