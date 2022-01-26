@@ -29,18 +29,23 @@ def main():
     }
     contour_names = []
     contour_association = {}
+
+    # mg_template = {
+    #     'image_series_id': True,
+    #     'study_desc_name': False,
+    #     'merge_study_serie_desc': False,
+    #     'force_uint16': True,
+    #     'force_int16': False,
+    # }
+
     rt_template = {
         'image_series_id': False,
         'study_desc_name': True,
         'merge_study_serie_desc': True,
         'force_uint16': False,
-        'force_int16': True}
-    mg_template = {
-        'image_series_id': True,
-        'study_desc_name': False,
-        'merge_study_serie_desc': False,
-        'force_uint16': True,
-        'force_int16': False,
+        'force_int16': True,
+        'include_patient_name': True,
+        'avoid_duplicate': True,
     }
 
     dicom_explorer = Dicom_Reporter(input_dir=input_dir,
@@ -50,8 +55,9 @@ def main():
                                     force_rewrite=True,
                                     save_json=True,
                                     load_json=True,
-                                    supp_tags=supp_tags, nb_threads=40,
-                                    verbose=True, **mg_template)
+                                    supp_tags=supp_tags, nb_threads=10,
+                                    verbose=True, **rt_template)
+
     # dicom_explorer.run_conversion()
 
 
