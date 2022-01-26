@@ -15,7 +15,7 @@ The dicom report will be available both in ".json" and ".txt" ("," delimiter)
 
 The ".run_conversion()" command line supports CT/MR/MG modalities, RTDOSE and RTSTRUCT DICOM formats. Other modalities may be supported but not tested.
 
-This class support unorganized DICOM data as each study will be matched by their "StudyInstanceUID"
+***This class support unorganized DICOM data as each study will be matched by their "SeriesInstanceUID" and "SOPInstanceUID"***
 
 Bastien Rigaud, PhD
 Laboratoire Traitement du Signal et de l'Image (LTSI), INSERM U1099
@@ -25,7 +25,7 @@ bastien.rigaud@univ-rennes1.fr
 
 ## Parameter example
 
-```
+```python
 :param input_dir: input folder where (unorganized) dicom can be found
 :param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\Date\StudyORSeriesDescription
 :param contour_names: list of contour names that will be written, ALL if empty
@@ -49,7 +49,7 @@ bastien.rigaud@univ-rennes1.fr
 
 ## Example for radiotherapy DICOM data
 
-```
+```python
 from Dicom_Reporter_Class import *
 
 def main():
@@ -90,7 +90,7 @@ def main():
 
 ## Example for mammography DICOM data
 
-```
+```python
 from Dicom_Reporter_Class import *
 
 def main():
@@ -139,7 +139,7 @@ def main():
 ```
 
 ## Example for cardiac images (multiple phases) DICOM data
-```
+```python
     tv_template = {
         'image_series_id': False,
         'study_desc_name': True,
