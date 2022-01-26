@@ -2,7 +2,7 @@
 
 ## Table of contents
 * [General info](#general-info)
-* [Example](#example)
+* [Parameter example](#Parameter-example)
 * [Example for radiotherapy](#Example-for-radiotherapy-DICOM-data)
 * [Example for mammography](#Example-for-radiotherapy-DICOM-data)
 * [Example for cardiac phases](#Example-for-radiotherapy-DICOM-data)
