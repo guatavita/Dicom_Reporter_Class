@@ -4,8 +4,8 @@
 * [General info](#general-info)
 * [Parameter example](#Parameter-example)
 * [Example for radiotherapy](#Example-for-radiotherapy-DICOM-data)
-* [Example for mammography](#Example-for-radiotherapy-DICOM-data)
-* [Example for cardiac phases](#Example-for-radiotherapy-DICOM-data)
+* [Example for mammography](#Example-for-mammography-DICOM-data)
+* [Example for cardiac phases](#Example-for-cardiac-images-(multiple phases)-DICOM-data)
 * [Dependencies](#dependencies)
 
 ## General info
@@ -88,7 +88,7 @@ def main():
     print("     Elapse time {}".format(time.time() - time_start))
 ```
 
-## Example for mammogram DICOM data
+## Example for mammography DICOM data
 
 ```
 from Dicom_Reporter_Class import *
