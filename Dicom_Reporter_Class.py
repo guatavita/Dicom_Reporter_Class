@@ -587,17 +587,32 @@ class Dicom_Reporter(object):
                     else:
                         # not sure if that is multithread safe either
                         dicom_handle = sitk.ReadImage(output_filename)
+                    self.dicom_dict[dcm_uid]['dicom_convert'] = 'DONE'
+                except:
+                    print('Failed on image convert {} {}'.format(dcm_uid, output_dir))
+                    self.dicom_dict[dcm_uid]['dicom_convert'] = 'FAILED'
 
+                try:
                     if self.dicom_dict[dcm_uid].get('RTDOSE'):
                         self.rtdose_writer(output_dir=output_dir,
                                            rtdose_sop_uid_list=self.dicom_dict[dcm_uid]['RTDOSE'],
                                            dicom_handle=dicom_handle)
+                        self.dicom_dict[dcm_uid]['dicom_convert'] = 'DONE'
+                    self.dicom_dict[dcm_uid]['dicom_convert'] = 'NONE'
+                except:
+                    print('Failed on RTdose convert {} {}'.format(dcm_uid, output_dir))
+                    self.dicom_dict[dcm_uid]['dicom_convert'] = 'FAILED'
 
+                try:
                     if self.dicom_dict[dcm_uid].get('RTSTRUCT'):
                         self.rtstruct_writer(output_dir=output_dir, dicom_handle=dicom_handle,
                                              rtstruct_sop_uid_list=self.dicom_dict[dcm_uid]['RTSTRUCT'])
+                        self.dicom_dict[dcm_uid]['dicom_convert'] = 'DONE'
+                    self.dicom_dict[dcm_uid]['dicom_convert'] = 'NONE'
                 except:
-                    print('Failed on {} {}'.format(dcm_uid, output_dir))
+                    print('Failed on RTstruct convert {} {}'.format(dcm_uid, output_dir))
+                    self.dicom_dict[dcm_uid]['dicom_convert'] = 'FAILED'
+
                 q.task_done()
 
     def run_conversion(self):
@@ -672,3 +687,5 @@ class Dicom_Reporter(object):
 
         if self.verbose:
             print("Elapsed time {}s".format(int(time.time() - time_start)))
+
+        self.save_dcm_report()
