@@ -597,21 +597,21 @@ class Dicom_Reporter(object):
                         self.rtdose_writer(output_dir=output_dir,
                                            rtdose_sop_uid_list=self.dicom_dict[dcm_uid]['RTDOSE'],
                                            dicom_handle=dicom_handle)
-                        self.dicom_dict[dcm_uid]['dicom_convert'] = 'DONE'
-                    self.dicom_dict[dcm_uid]['dicom_convert'] = 'NONE'
+                        self.dicom_dict[dcm_uid]['rtdose_convert'] = 'DONE'
+                    self.dicom_dict[dcm_uid]['rtdose_convert'] = 'NONE'
                 except:
                     print('Failed on RTdose convert {} {}'.format(dcm_uid, output_dir))
-                    self.dicom_dict[dcm_uid]['dicom_convert'] = 'FAILED'
+                    self.dicom_dict[dcm_uid]['rtdose_convert'] = 'FAILED'
 
                 try:
                     if self.dicom_dict[dcm_uid].get('RTSTRUCT'):
                         self.rtstruct_writer(output_dir=output_dir, dicom_handle=dicom_handle,
                                              rtstruct_sop_uid_list=self.dicom_dict[dcm_uid]['RTSTRUCT'])
-                        self.dicom_dict[dcm_uid]['dicom_convert'] = 'DONE'
-                    self.dicom_dict[dcm_uid]['dicom_convert'] = 'NONE'
+                        self.dicom_dict[dcm_uid]['rtstruct_convert'] = 'DONE'
+                    self.dicom_dict[dcm_uid]['rtstruct_convert'] = 'NONE'
                 except:
                     print('Failed on RTstruct convert {} {}'.format(dcm_uid, output_dir))
-                    self.dicom_dict[dcm_uid]['dicom_convert'] = 'FAILED'
+                    self.dicom_dict[dcm_uid]['rtstruct_convert'] = 'FAILED'
 
                 q.task_done()
 
