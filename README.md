@@ -1,4 +1,4 @@
-# PyWarp, deformable mesh registration framework using Python
+# DICOM REPORTER-CONVERTER
 
 ## Table of contents
 * [General info](#general-info)
@@ -7,7 +7,6 @@
 * [Example for mammography](#Example-for-radiotherapy-DICOM-data)
 * [Example for cardiac phases](#Example-for-radiotherapy-DICOM-data)
 * [Dependencies](#dependencies)
-* [References](#references)
 
 ## General info
 This class is a DICOM listener that will create a report of all the dicom seriesID/patientID in the output directory as well as possibibly convert them to NIfTI images.
