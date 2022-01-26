@@ -1,5 +1,15 @@
-# Dicom_Reporter_Class
+# PyWarp, deformable mesh registration framework using Python
 
+## Table of contents
+* [General info](#general-info)
+* [Example](#example)
+* [Example for radiotherapy](#Example-for-radiotherapy-DICOM-data)
+* [Example for mammography](#Example-for-radiotherapy-DICOM-data)
+* [Example for cardiac phases](#Example-for-radiotherapy-DICOM-data)
+* [Dependencies](#dependencies)
+* [References](#references)
+
+## General info
 This class is a DICOM listener that will create a report of all the dicom seriesID/patientID in the output directory as well as possibibly convert them to NIfTI images.
 
 The dicom report will be available both in ".json" and ".txt" ("," delimiter)
@@ -8,11 +18,17 @@ The ".run_conversion()" command line supports CT/MR/MG modalities, RTDOSE and RT
 
 This class support unorganized DICOM data as each study will be matched by their "StudyInstanceUID"
 
-### Example 
+Bastien Rigaud, PhD
+Laboratoire Traitement du Signal et de l'Image (LTSI), INSERM U1099
+Campus de Beaulieu, Université de Rennes 1
+35042 Rennes, FRANCE
+bastien.rigaud@univ-rennes1.fr
+
+## Parameter example
 
 ```
 :param input_dir: input folder where (unorganized) dicom can be found
-:param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\SeriesDate\StudyORSeriesDescription
+:param output_dir: output directory to save dcm_report.json and conversion output following \PatientID\Date\StudyORSeriesDescription
 :param contour_names: list of contour names that will be written, ALL if empty
 :param contour_association: dictionary of contour names association
 :param force_rewrite: for rewrite of NIfTI images (user should remove dcm_report.json)
@@ -24,6 +40,7 @@ This class support unorganized DICOM data as each study will be matched by their
 :param merge_study_serie_desc: merge study and series descript for image folder name
 :param include_patient_name: include patient name with MRN in output folder name
 :param avoid_duplicate: True if you want to add _N after folder name in case duplicate output foldername
+:param split_by_cardiac_phase: split SeriesInstanceUID using NominalPercentageOfCardiacPhase
 :param save_json: save dcm_report.json in output_dir
 :param load_json: reload previous dcm_report.json
 :param supp_tags: extract DICOM metadata for in-house usage, format dict such as {'SOPClassUID': '0008|0016',}
@@ -31,7 +48,7 @@ This class support unorganized DICOM data as each study will be matched by their
 :param verbose: True to have output prints
 ```
 
-#### For radiotherapy DICOM data
+## Example for radiotherapy DICOM data
 
 ```
 from Dicom_Reporter_Class import *
@@ -53,7 +70,10 @@ def main():
         'study_desc_name': True,
         'merge_study_serie_desc': True,
         'force_uint16': False,
-        'force_int16': True}
+        'force_int16': True,
+        'include_patient_name': True,
+        'avoid_duplicate': True,
+    }
         
     time_start = time.time()
     dicom_explorer = Dicom_Reporter(input_dir=input_dir,
@@ -69,7 +89,7 @@ def main():
     print("     Elapse time {}".format(time.time() - time_start))
 ```
 
-#### For mammogram DICOM data
+## Example for mammogram DICOM data
 
 ```
 from Dicom_Reporter_Class import *
@@ -100,6 +120,9 @@ def main():
         'merge_study_serie_desc': False,
         'force_uint16': True,
         'force_int16': False,
+        'include_patient_name': False,
+        'avoid_duplicate': False,
+        'split_by_cardiac_phase': False,
     }
 
     time_start = time.time()   
@@ -116,7 +139,7 @@ def main():
     print("     Elapse time {}".format(time.time() - time_start))
 ```
 
-#### For cardiac images (multiple phases) DICOM data
+## Example for cardiac images (multiple phases) DICOM data
 ```
     tv_template = {
         'image_series_id': False,
@@ -140,8 +163,19 @@ def main():
                                     verbose=True, **tv_template)
     dicom_explorer.run_conversion()
 ```
-### Dependencies
-
+## Dependencies
 ```
 pip install -r requirements.txt
+```
+```
+tqdm
+numpy
+SimpleITK
+pydicom>=2.2.1
+opencv-python
+matplotlib
+ipywidgets
+pathvalidate
+python-gdcm
+PlotScrollNumpyArrays
 ```

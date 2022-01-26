@@ -27,6 +27,8 @@ def main():
         'PixelSpacing': '0028|0030',
         'OrganDose': '0040|0316',
     }
+
+    # README.md
     contour_names = []
     contour_association = {}
 
