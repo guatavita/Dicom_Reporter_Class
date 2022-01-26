@@ -598,7 +598,8 @@ class Dicom_Reporter(object):
                                            rtdose_sop_uid_list=self.dicom_dict[dcm_uid]['RTDOSE'],
                                            dicom_handle=dicom_handle)
                         self.dicom_dict[dcm_uid]['rtdose_convert'] = 'DONE'
-                    self.dicom_dict[dcm_uid]['rtdose_convert'] = 'NONE'
+                    else:
+                        self.dicom_dict[dcm_uid]['rtdose_convert'] = 'NONE'
                 except:
                     print('Failed on RTdose convert {} {}'.format(dcm_uid, output_dir))
                     self.dicom_dict[dcm_uid]['rtdose_convert'] = 'FAILED'
@@ -608,7 +609,8 @@ class Dicom_Reporter(object):
                         self.rtstruct_writer(output_dir=output_dir, dicom_handle=dicom_handle,
                                              rtstruct_sop_uid_list=self.dicom_dict[dcm_uid]['RTSTRUCT'])
                         self.dicom_dict[dcm_uid]['rtstruct_convert'] = 'DONE'
-                    self.dicom_dict[dcm_uid]['rtstruct_convert'] = 'NONE'
+                    else:
+                        self.dicom_dict[dcm_uid]['rtstruct_convert'] = 'NONE'
                 except:
                     print('Failed on RTstruct convert {} {}'.format(dcm_uid, output_dir))
                     self.dicom_dict[dcm_uid]['rtstruct_convert'] = 'FAILED'
