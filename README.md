@@ -9,6 +9,16 @@
 * [Dependencies](#dependencies)
 
 ## General info
+
+| Features           | Status             |
+|--------------------|--------------------|
+| CT/MRI             | :white_check_mark: |
+| Mammography        | :white_check_mark: |
+| 4D cardiac CT scan | :white_check_mark: |
+| RTstruct           | :white_check_mark: |
+| RTdose             | :white_check_mark: |
+| Oblique images     | :construction: |
+
 This class is a DICOM listener that will create a report of all the dicom seriesID/patientID in the output directory as well as possibibly convert them to NIfTI images.
 
 The dicom report will be available both in ".json" and ".txt" ("," delimiter)
