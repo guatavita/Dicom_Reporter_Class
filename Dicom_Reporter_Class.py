@@ -553,7 +553,7 @@ class Dicom_Reporter(object):
                             pts_array = np.array(
                                 [dicom_handle.TransformPhysicalPointToIndex(i) for i in np.array(pts_list)])
                             slice_mask = cv2.fillPoly(np.zeros(ref_size[:2]), [pts_array[:, :2].astype(np.int32)], 1)
-                            slice_id = int(pts_array[0, 2])
+                            slice_id = int(np.min(pts_array[:, 2]))
                             mask[slice_id, :, :][slice_mask > 0] += 1
 
                         mask = mask % 2
