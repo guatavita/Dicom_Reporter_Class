@@ -532,6 +532,11 @@ class Dicom_Reporter(object):
                         continue
 
                     if roi_contour.get('ContourSequence') is None:
+                        print("ROI {} has no contour sequence, PASSED".format(roi_name))
+                        continue
+
+                    if not roi_contour.ContourSequence:
+                        print("ROI {} has no contour sequence, PASSED".format(roi_name))
                         continue
 
                     if self.contour_association.get(roi_name):
@@ -653,7 +658,7 @@ class Dicom_Reporter(object):
             if self.include_patient_name:
                 output_path = os.path.join(self.output_dir,
                                            "{}_{}".format('^'.join(
-                                               [x for x in self.dicom_dict[dcm_uid]['PatientName'].split('^') if
+                                               [x.replace(" ", "") for x in self.dicom_dict[dcm_uid]['PatientName'].split('^') if
                                                 x]).title(),
                                                           self.dicom_dict[dcm_uid]['PatientID'].rstrip()))
             else:
