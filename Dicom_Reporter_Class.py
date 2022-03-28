@@ -150,6 +150,9 @@ def dictionary_creator(series_uid, dicom_filenames, dicom_dict, rd_dict, rt_dict
             rd_dict[uid_dict['SOPInstanceUID']] = uid_dict
     elif modality.lower() == 'rtstruct':
         if uid_dict['SOPInstanceUID'] not in rt_dict:
+            # avoid loading the contour sequence right now
+            # this would quickly fill the memory if scanning lot of DICOMs
+            uid_dict['ROIContourSequence']=None
             rt_dict[uid_dict['SOPInstanceUID']] = uid_dict
     elif modality.lower() not in ['rtplan']:
         if series_uid not in dicom_dict:
@@ -525,8 +528,10 @@ class Dicom_Reporter(object):
                 continue
             try:
                 detailed_report.append(rtstruct_sop_uid)
+                # reload ROIContourSequence
+                ds = pydicom.dcmread(self.rt_dict[rtstruct_sop_uid].get('dicom_filenames')[0], stop_before_pixels=True)
                 for roi_structset, roi_contour in zip(self.rt_dict[rtstruct_sop_uid].get('StructureSetROISequence'),
-                                                      self.rt_dict[rtstruct_sop_uid].get('ROIContourSequence')):
+                                                      ds.get('ROIContourSequence')):
                     roi_name = roi_structset.ROIName
                     if self.contour_names and not self.contour_association.get(roi_name):
                         continue
