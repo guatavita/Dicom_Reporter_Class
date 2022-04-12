@@ -176,7 +176,10 @@ def dicom_reader_worker(A):
 
 def dicom_to_sitk(lstFilesDCM, force_uint16=False, force_int16=False):
     RefDs = pydicom.read_file(lstFilesDCM[0])
-    if RefDs.get('NumberOfFrames'):
+
+    if len(lstFilesDCM) > 1:
+        ConstPixelDims = (len(lstFilesDCM), int(RefDs.Rows), int(RefDs.Columns))
+    elif RefDs.get('NumberOfFrames'):
         ConstPixelDims = (int(RefDs.NumberOfFrames), int(RefDs.Rows), int(RefDs.Columns))
     else:
         ConstPixelDims = (len(lstFilesDCM), int(RefDs.Rows), int(RefDs.Columns))
